@@ -1,0 +1,14 @@
+# ROS构建、运行记录和本机临时文件
+build/
+devel/
+install/
+log/
+logs/
+__pycache__/
+*.py[cod]
+*.bag
+*.bag.active
+.catkin_tools/
+.idea/
+.vscode/
+.serena/
