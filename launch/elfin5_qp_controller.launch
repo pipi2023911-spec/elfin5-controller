@@ -1,0 +1,11 @@
+<!-- 当 Gazebo 和 MoveIt 已经运行时，只启动 QP 控制节点。 -->
+<launch>
+  <node pkg="elfin5_qp_controller"
+        type="elfin5_qp_controller_node"
+        name="elfin5_qp_controller"
+        output="screen"
+        required="true">
+    <rosparam command="load"
+              file="$(find elfin5_qp_controller)/config/elfin5_qp_controller.yaml"/>
+  </node>
+</launch>

@@ -1,0 +1,43 @@
+# Elfin5 笛卡尔 QP 控制器 V1 参数。
+# 单位依次为米、秒、弧度、弧度每秒和弧度每二次方秒。
+
+planning_group: elfin_arm
+# base_pose 表示 absolute_frame -> elfin_base_link。该配置必须与上游定位系统
+# 输出的机械臂基座坐标定义一致。
+base_link: elfin_base_link
+tip_link: elfin_end_link
+absolute_frame: world
+
+# 在线控制周期与笛卡尔目标参数。
+control_rate: 50.0
+position_gain: 1.5
+maximum_cartesian_speed: 0.15
+goal_tolerance: 0.005
+command_horizon_factor: 2.5
+
+# QP达到迭代上限但仍满足安全约束时，控制器进入QP_DEGRADED而不是直接停机。
+# 首轮实验先保留默认值，根据诊断中的迭代次数和残差决定是否调整。
+qp_max_iterations: 100
+qp_tolerance: 1.0e-7
+
+# 关节位置边界从 robot_description 读取。以下数组顺序为
+# [elfin_joint1, ..., elfin_joint6]，数值与 Elfin5 MoveIt 配置保持一致。
+joint_velocity_limits: [1.57, 1.57, 1.57, 1.57, 1.57, 1.57]
+joint_acceleration_limits: [12.56, 12.56, 12.56, 12.56, 12.56, 12.56]
+position_limit_margin: 0.03
+velocity_limit_scale: 0.70
+acceleration_limit_scale: 0.70
+
+# 针对 3x6 平移雅可比的奇异性检测与规避参数。
+nominal_damping: 0.0001
+singularity_damping: 0.08
+singularity_warning_threshold: 0.08
+singularity_safe_threshold: 0.05
+singularity_stop_threshold: 0.015
+singularity_avoidance_gain: 0.40
+joint_centering_gain: 0.08
+finite_difference_step: 0.0001
+
+# 消息头时间戳为零时，控制器仍使用本节点接收时间判断数据是否过期；
+# 正式发布器应填写当前时间戳，以便同时发现传输延迟和发布器中断。
+input_timeout: 1.0

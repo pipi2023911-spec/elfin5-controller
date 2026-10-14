@@ -1,0 +1,136 @@
+# Elfin5 QP 控制器自动化仿真测试配置。
+# 所有关节角单位为 rad，目标偏移单位为 m，时间单位为 s。
+
+planning_group: elfin_arm
+absolute_frame: world
+joint_names:
+  - elfin_joint1
+  - elfin_joint2
+  - elfin_joint3
+  - elfin_joint4
+  - elfin_joint5
+  - elfin_joint6
+
+base_pose:
+  position: [0.0, 0.0, 0.1]
+  orientation: [0.0, 0.0, 0.0, 1.0]
+  publish_rate: 10.0
+
+topics:
+  joint_states: /joint_states
+  command: /elfin_arm_controller/command
+  base_pose: /elfin5_qp_controller/base_pose
+  target_point: /elfin5_qp_controller/target_point
+  current_point: /elfin5_qp_controller/current_point
+  position_error: /elfin5_qp_controller/position_error
+  singular_value: /elfin5_qp_controller/min_singular_value
+  diagnostics: /elfin5_qp_controller/state
+  enable_service: /elfin5_qp_controller/enable
+  controller_list_service: /controller_manager/list_controllers
+
+limits:
+  goal_tolerance: 0.005
+  joint_goal_tolerance: 0.04
+  maximum_joint_velocity: 1.099
+  maximum_joint_acceleration: 8.792
+  command_limit_tolerance: 0.08
+  input_timeout: 1.0
+
+timing:
+  startup_timeout: 20.0
+  state_timeout: 5.0
+  moveit_settle_time: 1.0
+  command_quiet_time: 2.0
+  reach_timeout: 25.0
+  target_settle_time: 0.3
+  sample_period: 0.05
+
+moveit:
+  velocity_scaling: 0.15
+  acceleration_scaling: 0.15
+
+normal_initial_joints: &normal_initial_joints [0.0, -0.5, 0.8, 0.0, 0.8, 0.0]
+
+rounds:
+  R1:
+    title: 普通三维闭环
+    kind: reach
+    initial_joints: *normal_initial_joints
+    expected_initial_sigma: [0.12, 0.40]
+    target_offsets:
+      - [-0.15, 0.08, 0.06]
+
+  R2:
+    title: 多方向泛化
+    kind: reach
+    initial_joints: *normal_initial_joints
+    expected_initial_sigma: [0.12, 0.40]
+    relative_to: current
+    target_offsets:
+      - [-0.12, 0.00, 0.08]
+      - [-0.08, -0.12, -0.06]
+      - [0.08, 0.10, 0.04]
+
+  R3:
+    title: 运动中在线换目标
+    kind: retarget
+    initial_joints: *normal_initial_joints
+    expected_initial_sigma: [0.12, 0.40]
+    switch_after: 1.0
+    target_offsets:
+      - [-0.18, 0.05, 0.05]
+      - [-0.08, -0.12, 0.08]
+
+  R4:
+    title: 速度饱和与命令约束
+    kind: constraints
+    initial_joints: *normal_initial_joints
+    expected_initial_sigma: [0.12, 0.40]
+    target_offsets:
+      - [-0.25, 0.12, 0.08]
+
+  R5:
+    title: 奇异警戒边缘
+    kind: singular_reach
+    initial_joints: [0.0, -0.5, 0.3, 0.0, 0.3, 0.0]
+    expected_initial_sigma: [0.075, 0.12]
+    target_offsets:
+      - [0.00, 0.10, 0.05]
+
+  R6:
+    title: 警戒区内恢复
+    kind: singular_recovery
+    initial_joints: [0.0, -0.5, 0.2, 0.0, 0.2, 0.0]
+    expected_initial_sigma: [0.045, 0.08]
+    minimum_sigma_improvement: 0.003
+    target_offsets:
+      - [0.00, 0.12, 0.04]
+
+  R7:
+    title: 较深奇异区恢复
+    kind: singular_protection
+    initial_joints: [0.0, -0.5, 0.1, 0.0, 0.1, 0.0]
+    expected_initial_sigma: [0.015, 0.05]
+    minimum_sigma_improvement: 0.003
+    allowed_safe_terminal_states: [QP_INFEASIBLE, SINGULARITY_STOP]
+    target_offsets:
+      - [0.00, 0.10, 0.03]
+
+  R8:
+    title: 停止区与精确奇异保护
+    kind: deep_singularity
+    requires_deep_singularity_permission: true
+    initial_joints: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    expected_initial_sigma: [0.0, 0.015]
+    minimum_sigma_improvement: 0.003
+    allowed_safe_terminal_states: [QP_INFEASIBLE, SINGULARITY_STOP]
+    target_offsets:
+      - [0.00, 0.10, 0.00]
+
+  R9:
+    title: 输入超时保护
+    kind: stale_input
+    initial_joints: *normal_initial_joints
+    expected_initial_sigma: [0.12, 0.40]
+    target_offsets:
+      - [-0.15, 0.08, 0.06]

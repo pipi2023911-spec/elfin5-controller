@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<!-- ROS包清单：保留原V2依赖，补充硬件接入所用消息、TF、URDF和可视化运行依赖。
+     这里声明依赖不代表会自动启动厂家主站或使能机械臂；启动责任由现场流程明确。
+     ROS包名保持elfin5_qp_controller，目录名可保留交付目录名称。 -->
+
+<package format="2">
+  <name>elfin5_qp_controller</name>
+  <version>1.0.0</version>
+  <description>Elfin5 末端位置 QP 控制器，支持隔离的 EtherCAT 真机接入、移动基座和 RViz 监视。</description>
+
+  <maintainer email="maintainer@example.com">Elfin5 QP Controller Maintainer</maintainer>
+  <license>BSD-3-Clause</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <depend>roscpp</depend>
+  <depend>rospy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>trajectory_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>std_srvs</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>moveit_core</depend>
+  <depend>moveit_ros_planning</depend>
+  <depend>eigen</depend>
+
+  <!-- 完整Gazebo启动文件直接引用以下两个包。它们不是编译依赖，但必须作为
+       运行依赖声明，否则单独安装本包后roslaunch会找不到被include的文件。 -->
+  <exec_depend>elfin_gazebo</exec_depend>
+  <exec_depend>elfin5_moveit_config</exec_depend>
+  <exec_depend>moveit_commander</exec_depend>
+  <!-- 网关只读查询运行控制器与占用资源；不自动切换控制器。 -->
+  <depend>controller_manager_msgs</depend>
+  <exec_depend>rosbag</exec_depend>
+  <exec_depend>rospkg</exec_depend>
+
+  <!-- 读取下层控制器desired/actual/error，构造过程跟踪误差。 -->
+  <depend>control_msgs</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>urdf</depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>rviz</exec_depend>
+  <exec_depend>xacro</exec_depend>
+  <exec_depend>elfin_description</exec_depend>
+  <!-- 离线绘图依赖；不是实时控制回调的一部分。 -->
+  <exec_depend>python-matplotlib</exec_depend>
+  <!-- 仅用于独立ROS接线测试，不是现场运动节点。 -->
+  <test_depend>rostest</test_depend>
+  <export/>
+</package>

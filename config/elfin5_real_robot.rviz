@@ -1,0 +1,67 @@
+# 真机RViz显示配置，配合elfin5_qp_real_robot.launch使用。
+# Fixed Frame固定为world；RobotModel读取硬件专用模型参数，关节位置来自真实反馈。
+# 红色目标/绿色TCP/连线由monitor发布，Path是已观测位置历史。
+# 本配置不提供MoveIt执行按钮，也不负责发送控制指令。
+
+Panels:
+  - Class: rviz/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Global Options:
+    Background Color: 40; 40; 40
+    # 所有空间显示都在不移动的world中，不能改成base来掩盖基座运动。
+    Fixed Frame: world
+    Frame Rate: 30
+  Displays:
+    - Class: rviz/Grid
+      Name: Ground
+      Enabled: true
+      Cell Size: 0.1
+      Plane Cell Count: 30
+    - Class: rviz/RobotModel
+      Name: Real robot feedback
+      Enabled: true
+      # 专用参数避免覆盖厂家全局模型；TF链接名称仍需在系统中保持唯一。
+      Robot Description: /elfin5_real/robot_description
+      Visual Enabled: true
+      Collision Enabled: false
+      TF Prefix: ""
+      Alpha: 1
+    - Class: rviz/TF
+      Name: Frames
+      Enabled: true
+      Show Axes: true
+      Show Names: true
+      Marker Scale: 0.2
+    - Class: rviz/MarkerArray
+      Name: Target and measured TCP estimate
+      Enabled: true
+      # 该标记话题含目标、估计TCP、误差连线和有效性文字。
+      Marker Topic: /elfin5_real/monitor/markers
+      Queue Size: 10
+    - Class: rviz/Path
+      Name: World TCP trace
+      Enabled: true
+      Topic: /elfin5_real/monitor/path
+      Color: 0; 220; 120
+      Line Style: Lines
+      Line Width: 0.01
+      Buffer Length: 1
+  Tools:
+    - Class: rviz/Interact
+    - Class: rviz/MoveCamera
+    - Class: rviz/Select
+  Views:
+    Current:
+      Class: rviz/Orbit
+      Distance: 2.5
+      Pitch: 0.4
+      Yaw: 0.7
+      Focal Point:
+        X: 0
+        Y: 0
+        Z: 0.5
+Window Geometry:
+  Width: 1280
+  Height: 800

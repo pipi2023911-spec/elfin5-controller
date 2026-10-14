@@ -1,0 +1,38 @@
+<!-- 隔离ROS状态机测试启动文件，不是现场启动配置。
+     内嵌URDF、site_review_complete=true和测试限值只服务于假接口夹具。
+     所有实际输出接到elfin5_test命名空间，测试不启动EtherCAT或真实控制器。
+     请用rostest的独立master运行，不把该文件混入真机launch。 -->
+
+<launch>
+  <!-- rostest creates an isolated ROS master; no vendor driver or physical topic. -->
+  <group ns="elfin5_real">
+    <!-- 最小六关节模型，只为检查站点限值在URDF范围内，不代表Elfin5几何。 -->
+    <param name="robot_description" value="&lt;robot name=&quot;gate_test&quot;>&lt;link name=&quot;elfin_base_link&quot;/>&lt;link name=&quot;l1&quot;/>&lt;joint name=&quot;elfin_joint1&quot; type=&quot;revolute&quot;>&lt;parent link=&quot;elfin_base_link&quot;/>&lt;child link=&quot;l1&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;link name=&quot;l2&quot;/>&lt;joint name=&quot;elfin_joint2&quot; type=&quot;revolute&quot;>&lt;parent link=&quot;l1&quot;/>&lt;child link=&quot;l2&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;link name=&quot;l3&quot;/>&lt;joint name=&quot;elfin_joint3&quot; type=&quot;revolute&quot;>&lt;parent link=&quot;l2&quot;/>&lt;child link=&quot;l3&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;link name=&quot;l4&quot;/>&lt;joint name=&quot;elfin_joint4&quot; type=&quot;revolute&quot;>&lt;parent link=&quot;l3&quot;/>&lt;child link=&quot;l4&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;link name=&quot;l5&quot;/>&lt;joint name=&quot;elfin_joint5&quot; type=&quot;revolute&quot;>&lt;parent link=&quot;l4&quot;/>&lt;child link=&quot;l5&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;link name=&quot;l6&quot;/>&lt;joint name=&quot;elfin_joint6&quot; type=&quot;revolute&quot;>&lt;parent link=&quot;l5&quot;/>&lt;child link=&quot;l6&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;/robot>"/>
+    <node pkg="elfin5_qp_controller" type="real_robot_bridge_node" name="bridge" required="true" output="screen">
+      <!-- 测试专用条件：让夹具能进入READY/ACTIVE以验证状态转换；不能照搬到现场。 -->
+      <rosparam>
+joint_names: [elfin_joint1, elfin_joint2, elfin_joint3, elfin_joint4, elfin_joint5, elfin_joint6]
+position_lower: [-1, -1, -1, -1, -1, -1]
+position_upper: [1, 1, 1, 1, 1, 1]
+velocity_limits: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+acceleration_limits: [10, 10, 10, 10, 10, 10]
+max_endpoint_step: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+site_review_complete: true
+hardware_id: test_robot
+joint_states_topic: /elfin5_test/joints
+base_pose_topic: /elfin5_test/base
+target_point_topic: /elfin5_test/target
+controller_state_topic: /elfin5_test/controller
+hardware_status_topic: /elfin5_test/hardware
+command_topic: /elfin5_test/command
+list_controllers_service: /elfin5_test/list
+stop_service: /elfin5_test/stop
+candidate_node: /elfin5_real/test_real_robot_wiring
+candidate_max_age: 0.05
+      </rosparam>
+    </node>
+    <!-- 可执行夹具会发送假反馈、假OK和假stop回执，只验证网关行为。 -->
+    <test test-name="real_robot_wiring" name="test_real_robot_wiring"
+          pkg="elfin5_qp_controller" type="test_real_robot_wiring.py" time-limit="40"/>
+  </group>
+</launch>

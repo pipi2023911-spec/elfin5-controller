@@ -1,0 +1,25 @@
+<!--
+  Elfin5 V1 Gazebo 完整验证启动文件。
+
+  该文件启动现有 Elfin5 Gazebo 模型和 JointTrajectoryController，加载 MoveIt
+  语义模型，再启动新的笛卡尔 QP 控制器。只有 enable 服务被设为 true 后，
+  QP 控制器才会开始发布运动命令。
+-->
+<launch>
+  <arg name="display" default="true"/>
+
+  <include file="$(find elfin_gazebo)/launch/elfin5_empty_world.launch"/>
+
+  <include file="$(find elfin5_moveit_config)/launch/moveit_planning_execution.launch">
+    <arg name="display" value="$(arg display)"/>
+  </include>
+
+  <node pkg="elfin5_qp_controller"
+        type="elfin5_qp_controller_node"
+        name="elfin5_qp_controller"
+        output="screen"
+        required="true">
+    <rosparam command="load"
+              file="$(find elfin5_qp_controller)/config/elfin5_qp_controller.yaml"/>
+  </node>
+</launch>
