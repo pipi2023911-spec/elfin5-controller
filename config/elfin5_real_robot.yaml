@@ -6,7 +6,7 @@
 
 # 2026-10-13现场信息：用户目前只有源码，尚无实测周期、最大延迟及停止/看门狗说明。
 # 下列时间数值保持原值、未通过真机核验；待用户提供证据后局部调整，不为通过门禁放宽。
-# 记录位置：docs/HARDWARE_IMPLEMENTATION_STATUS.md。
+# 记录位置：docs/usage.md。
 # Hardware integration defaults: observation/shadow only.
 # These are NOT commissioned hardware limits. Empty arrays block ACTIVE.
 # 网关私有参数：所有放行条件都满足并显式调用enable后，才可能向厂家command发消息。

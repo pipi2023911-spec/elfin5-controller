@@ -1,107 +1,103 @@
-# Elfin5 QP Controller V1 — ROS 接口
+# 当前接口
 
-节点名：`/elfin5_qp_controller`
+本文对应当前 V2 实现。以下名称以 `elfin5_qp_real_robot.launch` 默认配置为准；现场改名时需同步修改配置、录包与绘图参数。
 
-所有坐标长度单位为米，角度单位为弧度。`base_pose` 与 `target_point`
-必须处在参数 `absolute_frame` 指定的绝对坐标系中；任一 `frame_id` 为空或
-与该参数不一致时，控制器发布保持命令并拒绝运动。
+## 坐标与控制量
 
-当前接口只完成末端位置控制，不约束末端姿态，也不提供全局路径规划、环境避障、
-夹爪控制或抓取执行。
+- 长度为 m，关节位置为 rad，速度为 rad/s，加速度为 rad/s²，时间为 s。
+- `world` 固定；`base_pose` 表示 `elfin_base_link` 在 `world` 中的位姿，即把基座坐标变换到世界坐标的 `T_world_base`。
+- `target_point` 为 `world` 中的目标 XYZ；末端为 `elfin_end_link`，不约束姿态。
+- 默认六轴为 `elfin_joint1` 至 `elfin_joint6`。消息按名称匹配，限值数组按 `joint_names` 顺序填写。
+- 输入须具有有效、非零、递增的源时间戳和有限数值；基座四元数须符合单位四元数检查。基座与目标的 `header.frame_id` 为 `world`。
+
+## 控制链与节点
+
+```text
+/joint_states、/base_pose、/target_point
+    → bridge 输入检查 → /elfin5_real/validated/*
+    → qp_candidate → /elfin5_real/candidate_trajectory
+    → bridge 放行和命令检查 → /elfin_arm_controller/command
+    → 厂家位置 JTC → RobotHW → EtherCAT
+```
+
+`/elfin5_real/bridge` 管理真实命令放行；`/elfin5_real/qp_candidate` 复用现有 QP；`/elfin5_real/monitor` 只读计算误差和显示。监视、模型发布器和 RViz 不参与运动准入。QP 或 bridge 退出会触发 launch 关闭，但进程退出不能代替站点停止及硬件看门狗。
 
 ## 输入话题
 
-### `~base_pose`
+| 默认话题 | 类型 | 来源与用途 |
+|---|---|---|
+| `/joint_states` | `sensor_msgs/JointState` | 厂家真实关节反馈，须包含六轴位置 |
+| `/base_pose` | `geometry_msgs/PoseStamped` | 定位系统提供基座在 world 中的位姿 |
+| `/target_point` | `geometry_msgs/PointStamped` | 上游提供 world 中的目标点 |
+| `/elfin_arm_controller/state` | `control_msgs/JointTrajectoryControllerState` | JTC 提供六轴 desired 位置/速度与 actual 位置，供命令检查和关节误差计算 |
+| `/elfin5_hardware/status` | `diagnostic_msgs/DiagnosticArray` | 现场适配器汇总硬件互锁；本包未实现厂家专用适配器 |
+| `/elfin5_real/qp_candidate/state` | `diagnostic_msgs/DiagnosticArray` | QP 状态，供 bridge 判断计算是否正常 |
 
-- 类型：`geometry_msgs/PoseStamped`
-- 发布方：未来由主控台发布；仿真阶段可由测试命令发布。
-- 含义：参数 `base_link` 指定的机械臂基座坐标系在绝对坐标系中的位姿
-  `T_absolute_base`；本版本默认对应URDF中的 `elfin_base_link`。
-- 要求：四元数必须有效且非零。
-- 超时：同时检查消息时间戳和本节点接收时间。
+网关对这些输入检查格式、源时间和接收时效，并限制关节反馈与基座、JTC 反馈的时间差。固定目标也需要上游持续发布有效的新样本；不得为失效数据重打时间戳。
 
-### `~target_point`
+硬件诊断须恰好有一个 `name=elfin5_hardware` 的匹配项，`hardware_id` 与非空配置值一致，且 `level=OK`。现场适配器只有在使能、位置模式、驱动故障、急停、看门狗及执行权限等实际条件满足时才能报告 OK；未知或不满足应报告非 OK。该话题应持续发布、使用真实时间戳且非锁存；不能用固定 OK 心跳代替。网关不直接读取 EtherCAT WKC、OP 状态或驱动故障字。
 
-- 类型：`geometry_msgs/PointStamped`
-- 发布方：未来由视觉或主控台发布。
-- 含义：机械臂末端需要到达的绝对三维坐标。
-- 说明：V1 不控制末端姿态，因此使用 `PointStamped` 而不是 `PoseStamped`。
-- 超时：同时检查消息时间戳和本节点接收时间。
+## 输出与诊断
 
-### `/joint_states`
+| 默认话题 | 类型 | 含义 |
+|---|---|---|
+| `/elfin5_real/validated/joint_states` | `sensor_msgs/JointState` | 检查通过的关节反馈，供 QP 和模型发布器使用 |
+| `/elfin5_real/validated/base_pose` | `geometry_msgs/PoseStamped` | 检查通过的基座输入 |
+| `/elfin5_real/validated/target_point` | `geometry_msgs/PointStamped` | 检查通过的目标输入 |
+| `/elfin5_real/candidate_trajectory` | `trajectory_msgs/JointTrajectory` | QP 候选，尚未代表实际下发 |
+| `/elfin_arm_controller/command` | `trajectory_msgs/JointTrajectory` | 仅 ACTIVE 且命令检查通过时由 bridge 原样下发 |
+| `/elfin5_real/bridge/state` | `std_msgs/String` | 锁存发布的 `状态: 原因`，无消息头时间戳 |
+| `/elfin5_real/qp_candidate/state` | `diagnostic_msgs/DiagnosticArray` | QP 状态和求解诊断 |
+| `/elfin5_real/qp_candidate/current_point` | `geometry_msgs/PointStamped` | QP 正运动学估计的 world 末端位置 |
+| `/elfin5_real/qp_candidate/position_error` | `std_msgs/Float64` | QP 末端位置误差，m |
+| `/elfin5_real/qp_candidate/min_singular_value` | `std_msgs/Float64` | 平移 Jacobian 的最小奇异值 |
 
-- 类型：`sensor_msgs/JointState`
-- 发布方：Gazebo 的 `joint_state_controller`。
-- 必须包含：`elfin_joint1` 至 `elfin_joint6`。
-- 要求：位置数组必须为有限数，并持续更新；过期后控制器进入保持状态。
+候选轨迹只接受单点、六轴位置和速度，不接受额外加速度或力矩数组。网关检查时间戳、轨迹时域、位置/速度/加速度限制、端点步长和相对 JTC 当前参考的三次插值包络；不裁剪、重打时间戳或替换命令。
 
-## 输出话题
+QP 诊断项名为 `elfin5_qp_controller`，状态取 `message` 冒号前的字段。可见状态有 `IDLE`、`WAITING_FOR_INPUT`、`RUNNING`、`REACHED`、`SINGULARITY_RECOVERY`、`SINGULARITY_STOP`、`QP_INFEASIBLE`、`QP_DEGRADED`、`INVALID_INPUT`、`STALE_INPUT`。网关仅接受 `RUNNING`、`REACHED`、`SINGULARITY_RECOVERY`；其余状态不满足放行条件。诊断键包括 `position_error_m`、`minimum_singular_value`、`qp_iterations`、`qp_projected_gradient_norm`。QP 状态与候选轨迹未按求解周期一一配对。
 
-### `/elfin_arm_controller/command`
+## 服务与网关状态机
 
-- 类型：`trajectory_msgs/JointTrajectory`
-- 接收方：现有 `position_controllers/JointTrajectoryController`。
-- 内容：按控制周期更新的单点短时域关节轨迹。
+| 服务 | 类型 | 契约 |
+|---|---|---|
+| `/elfin5_real/qp_candidate/enable` | `std_srvs/SetBool` | 开关候选计算；不使能电机，输出仍在隔离候选话题 |
+| `/elfin5_real/bridge/enable` | `std_srvs/SetBool` | true 显式请求放行；false 关闭放行，原为 ACTIVE 时请求站点停止 |
+| `/elfin5_real/bridge/reset` | `std_srvs/Trigger` | 人工清除网关锁存，回到 OBSERVE；不使能硬件、不恢复运动 |
+| `/elfin5_site/stop` | `std_srvs/Trigger` | 站点实现、bridge 调用的停止契约，不是已核实的厂家服务别名 |
+| `/controller_manager/list_controllers` | `controller_manager_msgs/ListControllers` | 厂家控制器管理器提供，bridge 只读查询 |
 
-### `~current_point`
+服务通信成功不等于业务成功，应检查响应 `success` 和 `message`。关闭网关服务的成功响应表示关闭/停止请求已受理，不代表停止服务已完成，更不代表机械臂已静止。
 
-- 类型：`geometry_msgs/PointStamped`
-- 内容：由正运动学计算的当前末端绝对坐标。
-- 发布条件：`joint_states` 和 `base_pose` 有效即可；不要求控制器已经enable，也不
-  要求已经收到target，便于在运动前选择安全目标点。
+| 状态 | 含义与转换 |
+|---|---|
+| `OBSERVE` | 不下发轨迹；条件全部满足后自动进入 READY |
+| `READY` | 可接受人工放行；条件失效回 OBSERVE，只有显式 enable(true) 才进入 ACTIVE |
+| `ACTIVE` | 逐条检查并下发候选；人工关闭回 OBSERVE 并请求停止；控制必要条件失效进入 FAULT_LATCHED |
+| `FAULT_LATCHED` | 禁止下发，保留首个控制故障原因并请求停止；数据恢复不会自动恢复运动 |
 
-### `~position_error`
+就绪条件包括：真实时钟、站点审查开关、设备标识与限值有效、六类输入有效且及时、JTC 正在运行并占用正确的六轴 `PositionJointInterface`、停止服务存在、控制器/发布者检查结果未过期。命令发布者应只有 bridge，候选发布者只有 qp_candidate，不能有竞争的 action goal 发布者。ROS 图检查是轮询快照，不是访问权限保障。
 
-- 类型：`std_msgs/Float64`
-- 单位：米。
-- 内容：当前末端与目标点的欧氏距离。
+正常关闭后，停止请求结束且条件满足可再次 READY，无需 reset，但仍需人工重新 enable。停止调用失败会锁存故障并禁止 reset；处理现场原因后，仅显式再次调用 enable(false) 才重试停止。故障后的成功停止仍需人工确认实际停机、调用 reset，再重新检查条件并显式 enable。没有自动故障复位、自动伺服使能或自动恢复运动。
 
-### `~min_singular_value`
+## RViz 与误差接口
 
-- 类型：`std_msgs/Float64`
-- 内容：平移雅可比 `Jv` 的最小奇异值，用于判断位置任务奇异性。
-- 发布条件：与 `~current_point` 相同，控制器未enable时也会发布。
+以下话题前缀均为 `/elfin5_real/monitor/`：
 
-### `~state`
+| 后缀 | 类型 | 含义 |
+|---|---|---|
+| `current_point` | `geometry_msgs/PointStamped` | 真实关节反馈、模型和基座定位估计的 world TCP |
+| `tracking_error` | `std_msgs/Float64` | 末端误差范数，m；无时间戳，分析优先使用 tracking_state |
+| `tracking_state` | `diagnostic_msgs/DiagnosticArray` | `name=elfin5_real_tracking`；含 valid、position_error_m、base_stamp、target_stamp；无效时 WARN/NaN |
+| `joint_tracking_error` | `sensor_msgs/JointState` | position 数组存六轴 `desired−actual`，rad，沿用同一 JTC state 的时间戳；不是机械臂关节角 |
+| `path` | `nav_msgs/Path` | 有界长度的估计 TCP 位置历史，姿态为显示占位 |
+| `markers` | `visualization_msgs/MarkerArray` | 目标、估计 TCP、误差连线及状态文字 |
 
-- 类型：`diagnostic_msgs/DiagnosticArray`
-- 状态：`IDLE`、`WAITING_FOR_INPUT`、`RUNNING`、`REACHED`、
-  `SINGULARITY_RECOVERY`、`SINGULARITY_STOP`、`QP_INFEASIBLE`、
-  `QP_DEGRADED`、`INVALID_INPUT`、`STALE_INPUT`。
-- 关键字段：位置误差、最小奇异值、QP迭代次数和投影梯度残差。
+末端误差为 `E(t)=||p_target_world(t)−p_tcp_world(t)||₂`，只画一条范数曲线；关节误差为六轴有符号过程跟踪误差。监视器以关节时间选择容许时间差内最近的基座样本，以及不晚于关节时间的最新目标，不插值伪造同步精度。末端误差是模型估计，不是外部测量的绝对精度。
 
-## 服务
+真机 launch 参数：`hardware_config` 指定站点 YAML，`rviz` 默认 true，`base_tf_mode` 默认 pose。pose 模式由 monitor 发布动态基座 TF；external 模式只核对外部动态 TF，仍需 base_pose。模型位于 `/elfin5_real/robot_description`，保留厂家内部固定旋转，只移除经过核验的固定 world 锚点；避免重复的模型/基座 TF 发布源。
 
-### `~enable`
+## 参数与仿真接口
 
-- 类型：`std_srvs/SetBool`
-- `data=true`：在 `joint_states`、`base_pose` 和 `target_point` 全部存在、未过期
-  且坐标系正确时允许闭环运动；否则服务回复 `success: false` 并保持禁用。
-- `data=false`：清零历史速度并发布一次当前位置保持命令，随后停止QP命令输出。
-  这样既能中止当前短时域命令，也允许实验人员在QP关闭后用其他工具设置初始姿态。
+参数入口：[真机配置](../config/elfin5_real_robot.yaml)、[QP 配置](../config/elfin5_qp_controller.yaml)。参数在启动时读取。真实限值及尚待核实的时间阈值见[基本使用](usage.md)。
 
-## 命令行示例
-
-以下示例匹配 `elfin_gazebo/launch/elfin5_empty_world.launch`：该文件使用
-`-z 0.1` 生成模型，因此 `elfin_base_link` 的绝对高度填写为0.1米。目标点必须
-按当前Elfin5工作空间调整。
-
-```bash
-rostopic pub -r 10 /elfin5_qp_controller/base_pose geometry_msgs/PoseStamped \
-  "header: {frame_id: 'world'}
-pose:
-  position: {x: 0.0, y: 0.0, z: 0.1}
-  orientation: {x: 0.0, y: 0.0, z: 0.0, w: 1.0}"
-
-rostopic pub -r 10 /elfin5_qp_controller/target_point geometry_msgs/PointStamped \
-  "header: {frame_id: 'world'}
-point: {x: 0.35, y: 0.10, z: 0.45}"
-
-rosservice call /elfin5_qp_controller/enable "data: true"
-```
-
-停止：
-
-```bash
-rosservice call /elfin5_qp_controller/enable "data: false"
-```
+独立仿真入口 `elfin5_qp_gazebo.launch` 中，控制节点名为 `/elfin5_qp_controller`，直接使用 `/joint_states` 和 `/elfin_arm_controller/command`；私有 `base_pose`、`target_point`、`enable`、`state` 及 QP 观测话题位于该节点名下。该入口没有真机网关，须在与真机隔离的 ROS 环境中运行。
