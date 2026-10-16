@@ -10,7 +10,7 @@
 # 【无效数据】以NaN断开曲线，不补零、不做角度取模；低频采样不能证明不存在高频峰值。
 # 此脚本离线读取数据，不发布ROS消息，也不会使机械臂运动。
 
-"""Plot TCP error norm and six signed joint tracking errors from a real ROS bag."""
+"""从真机录包绘制末端位置误差范数及六轴有符号过程跟踪误差。"""
 from __future__ import print_function
 import argparse
 import csv
@@ -31,14 +31,14 @@ def joint_errors(names, desired, actual, expected=JOINTS):
     if (len(names) != len(expected) or len(set(names)) != len(names) or
             len(desired) != len(names) or len(actual) != len(names) or
             set(names) != set(expected)):
-        raise ValueError("Invalid joint names or array sizes")
+        raise ValueError("关节名称或数组长度无效")
     # 建立名称→原数组索引，避免把J1的期望角减去J2的实际角。
     mapping = dict((name, i) for i, name in enumerate(names))
     result = []
     for name in expected:
         index = mapping[name]
         if not finite(desired[index]) or not finite(actual[index]):
-            raise ValueError("Non-finite joint position")
+            raise ValueError("关节位置不是有限数值")
         # 保留误差符号与原角度分支；此处不 wrap 到 ±π，防止掩盖零位/跳变问题。
         result.append(desired[index] - actual[index])
     return result
@@ -62,7 +62,7 @@ def series_stats(times, values, max_gap, threshold=None, eligible=None):
         if (eligible[i] and eligible[i-1] and 0 < dt <= max_gap and
                 finite(values[i-1]) and finite(values[i])):
             covered += dt
-            # Piecewise-constant duration estimate, explicitly tied to sample rate.
+            # 按分段常量估计持续时间，结果受采样频率影响。
             if threshold is not None and abs(values[i-1]) > threshold:
                 exceeded += dt
     return {
@@ -105,7 +105,7 @@ def write_csv(path, header, rows):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("bag")
-    parser.add_argument("--output", required=True, help="New output directory (never overwrite)")
+    parser.add_argument("--output", required=True, help="新的输出目录，不覆盖已有目录")
     parser.add_argument("--controller-topic", default="/elfin_arm_controller/state")
     parser.add_argument("--tracking-topic", default="/elfin5_real/monitor/tracking_state")
     parser.add_argument("--bridge-topic", default="/elfin5_real/bridge/state")
@@ -116,14 +116,14 @@ def main():
     parser.add_argument("--joint-tolerance-deg", nargs=6, type=float)
     # 默认显示全部阶段；指定此选项时只保留ACTIVE误差，其他阶段以无效段分隔。
     parser.add_argument("--active-only", action="store_true",
-                        help="Statistics/plots include ACTIVE intervals only; default includes all phases")
+                        help="只统计和绘制 ACTIVE 区间；默认包含所有阶段")
     args = parser.parse_args()
     for value in [args.max_gap] + ([args.tcp_tolerance_mm] if args.tcp_tolerance_mm is not None else []) + (args.joint_tolerance_deg or []):
         if not finite(value) or value <= 0:
-            parser.error("Gap and optional tolerances must be finite and positive")
+            parser.error("间隔和分析容差必须为有限正数")
     # 拒绝覆盖已有实验分析目录，防止同名输出悄悄替换上一轮结果。
     if os.path.exists(args.output):
-        parser.error("Output directory already exists")
+        parser.error("输出目录已存在，请选择新目录")
     import rosbag
     import matplotlib
     # 使用无窗口绘图后端，现场无桌面环境时也可以导出PNG。
@@ -211,7 +211,7 @@ def main():
                 joint_rows.append([receipt_s, stamp, phase] + desired + actual + errors + reported)
     # 无匹配数据时明确报错，避免输出看似成功但实际上没有观测的图。
     if not tcp and not joint_rows:
-        raise ValueError("No matching tracking/controller state messages in bag")
+        raise ValueError("录包中没有匹配的跟踪诊断或 JTC 状态消息")
     # 确认输入至少含目标消息后创建新目录；只向此目录写分析产物。
     os.makedirs(args.output)
     write_csv(os.path.join(args.output,"tcp_error.csv"),
@@ -235,7 +235,7 @@ def main():
         axis.set_xlabel("Time (s)")
         for t, label in events[:50]:
             axis.axvline(t-origin, color="grey", alpha=0.18, linewidth=0.7)
-        # Complete event labels are in events.csv; no invented motion events.
+        # 完整事件标记保存在 events.csv，不生成未经观测的运动事件。
     # 末端只画一条E(t)；仅在用户提供容差时绘制阈值线，不猜测硬件精度要求。
     if tcp:
         times = [r[0]-origin for r in tcp]; values = [r[2] for r in tcp]
@@ -268,7 +268,7 @@ def main():
     # 统计中的缺失结果用None/null表示；禁止把NaN写成非标准JSON数值。
     with open(os.path.join(args.output,"statistics.json"),"w") as stream:
         json.dump(metadata,stream,indent=2,allow_nan=False)
-    print("Saved error figures, raw paired samples, events and statistics to "+args.output)
+    print("误差曲线、原始配对样本、事件和统计已保存到："+args.output)
 
 if __name__ == "__main__":
     main()

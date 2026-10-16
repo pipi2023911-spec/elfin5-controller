@@ -96,9 +96,8 @@ bool checkCommand(const HardwareLimits& l, const HardwareCommand& c,
     // 同时限制端点离真实位置及参考位置的偏移，避免其中一个状态落后时产生大跳变。
     if (std::abs(q[i]-actual[i])>l.step[i] || std::abs(q[i]-ref[i])>l.step[i])
       return reject("endpoint_step_limit",reason);
-    // Bernstein hull of a cubic Hermite segment, using the observed controller
-    // reference as start. This is a conservative screen, not proof of the
-    // controller's future interpolation (state and execution are asynchronous).
+    // 使用观测到的控制器参考作为起点，计算三次 Hermite 曲线的 Bernstein 包络。
+    // 这是保守检查；状态与执行异步，不能据此证明控制器未来实际插值完全相同。
     // 对时域 T，四个控制点为 q0、q0+T*v0/3、q1−T*v1/3、q1。
     // 曲线位于这些点的凸包中；控制点全在位置限位内是充分条件，但不是必要条件。
     const double b[4]={ref[i],ref[i]+duration*ref_v[i]/3,

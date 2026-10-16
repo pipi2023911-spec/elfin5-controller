@@ -129,14 +129,14 @@ QPCartesianController::QPCartesianController(
       qp_max_iterations_ <= 0 ||
       !std::isfinite(qp_tolerance_) || qp_tolerance_ <= 0.0)
   {
-    throw std::invalid_argument("Controller parameters must be finite and positive");
+    throw std::invalid_argument("控制参数必须为有限正数");
   }
   if (!(0.0 <= singularity_stop_threshold_ &&
         singularity_stop_threshold_ < singularity_safe_threshold_ &&
         singularity_safe_threshold_ <= singularity_warning_threshold_))
   {
     throw std::invalid_argument(
-        "Singularity thresholds must satisfy 0 <= stop < safe <= warning");
+        "奇异性阈值必须满足 0 <= stop < safe <= warning");
   }
 
   // 求解器参数由YAML控制，实验时可以根据QP_DEGRADED比例调整，而无需改代码。
@@ -144,7 +144,7 @@ QPCartesianController::QPCartesianController(
 
   if (!loadRobotModel())
   {
-    throw std::runtime_error("Failed to initialize the Elfin5 MoveIt robot model");
+    throw std::runtime_error("Elfin5 MoveIt 机器人模型初始化失败");
   }
 
   // 输入与输出接口名称保持固定，方便视觉端和主控台提前联调。
@@ -172,12 +172,12 @@ QPCartesianController::QPCartesianController(
       ros::Duration(1.0 / std::max(control_rate_, 1.0)),
       &QPCartesianController::controlTimerCallback, this);
 
-  publishDiagnostics(ControllerState::IDLE, "Controller initialized", 0.0, 0.0,
+  publishDiagnostics(ControllerState::IDLE, "控制器已初始化", 0.0, 0.0,
                      ros::Time::now());
-  ROS_INFO_STREAM("Elfin5 QP controller initialized with " << joint_names_.size()
-                  << " joints; group=" << planning_group_
-                  << ", base=" << base_link_ << ", tip=" << tip_link_
-                  << ", Jacobian reference=" << jacobian_reference_link_model_->getName());
+  ROS_INFO_STREAM("Elfin5 QP 控制器已初始化，关节数：" << joint_names_.size()
+                  << "；规划组：" << planning_group_
+                  << "，基座：" << base_link_ << "，末端：" << tip_link_
+                  << "，Jacobian 参考链接：" << jacobian_reference_link_model_->getName());
 }
 
 bool QPCartesianController::loadRobotModel()
@@ -187,28 +187,28 @@ bool QPCartesianController::loadRobotModel()
   robot_model_ = robot_model_loader_->getModel();
   if (!robot_model_)
   {
-    ROS_ERROR("No MoveIt robot model was loaded from /robot_description");
+    ROS_ERROR("未能从 robot_description 加载 MoveIt 机器人模型，请检查参数及重映射");
     return false;
   }
 
   joint_model_group_ = robot_model_->getJointModelGroup(planning_group_);
   if (joint_model_group_ == nullptr)
   {
-    ROS_ERROR_STREAM("MoveIt planning group does not exist: " << planning_group_);
+    ROS_ERROR_STREAM("MoveIt 规划组不存在：" << planning_group_);
     return false;
   }
 
   tip_link_model_ = robot_model_->getLinkModel(tip_link_);
   if (tip_link_model_ == nullptr)
   {
-    ROS_ERROR_STREAM("Tip link does not exist in robot model: " << tip_link_);
+    ROS_ERROR_STREAM("模型中不存在末端链接：" << tip_link_);
     return false;
   }
 
   base_link_model_ = robot_model_->getLinkModel(base_link_);
   if (base_link_model_ == nullptr)
   {
-    ROS_ERROR_STREAM("Base link does not exist in robot model: " << base_link_);
+    ROS_ERROR_STREAM("模型中不存在基座链接：" << base_link_);
     return false;
   }
 
@@ -219,13 +219,13 @@ bool QPCartesianController::loadRobotModel()
       joint_model_group_->getJointModels();
   if (group_joint_models.empty())
   {
-    ROS_ERROR_STREAM("MoveIt planning group contains no joints: " << planning_group_);
+    ROS_ERROR_STREAM("MoveIt 规划组中没有关节：" << planning_group_);
     return false;
   }
   jacobian_reference_link_model_ = group_joint_models.front()->getParentLinkModel();
   if (jacobian_reference_link_model_ == nullptr)
   {
-    ROS_ERROR_STREAM("Cannot determine Jacobian reference link for group: "
+    ROS_ERROR_STREAM("无法确定规划组的 Jacobian 参考链接："
                      << planning_group_);
     return false;
   }
@@ -279,7 +279,7 @@ bool QPCartesianController::loadRobotModel()
       (maximum_velocities_.array() <= 0.0).any() ||
       (maximum_accelerations_.array() <= 0.0).any())
   {
-    ROS_ERROR("Joint velocity and acceleration limits must be finite and positive");
+    ROS_ERROR("关节速度和加速度限值必须为有限正数");
     return false;
   }
 
@@ -295,7 +295,7 @@ void QPCartesianController::jointStateCallback(
       !std::all_of(message->position.begin(), message->position.end(),
                    [](const double value) { return std::isfinite(value); }))
   {
-    ROS_ERROR_THROTTLE(1.0, "Rejected joint_states with missing or non-finite data");
+    ROS_ERROR_THROTTLE(1.0, "拒绝 joint_states：数据缺失或包含非有限数值");
     return;
   }
   std::lock_guard<std::mutex> lock(data_mutex_);
@@ -309,7 +309,7 @@ void QPCartesianController::basePoseCallback(
 {
   if (!isFinitePose(message->pose))
   {
-    ROS_ERROR_THROTTLE(1.0, "Rejected base_pose with non-finite data");
+    ROS_ERROR_THROTTLE(1.0, "拒绝 base_pose：包含非有限数值");
     return;
   }
   // 零四元数无法归一化，会使绝对坐标到基座坐标的变换产生 NaN。
@@ -320,7 +320,7 @@ void QPCartesianController::basePoseCallback(
       message->pose.orientation.w * message->pose.orientation.w);
   if (quaternion_norm < 1e-6)
   {
-    ROS_ERROR_THROTTLE(1.0, "Rejected base_pose with a zero-length quaternion");
+    ROS_ERROR_THROTTLE(1.0, "拒绝 base_pose：四元数长度为零");
     return;
   }
 
@@ -335,7 +335,7 @@ void QPCartesianController::targetPointCallback(
 {
   if (!isFinitePoint(message->point))
   {
-    ROS_ERROR_THROTTLE(1.0, "Rejected target_point with non-finite data");
+    ROS_ERROR_THROTTLE(1.0, "拒绝 target_point：包含非有限数值");
     return;
   }
   std::lock_guard<std::mutex> lock(data_mutex_);
@@ -362,18 +362,18 @@ bool QPCartesianController::enableCallback(
       previous_velocity_command_.setZero();
       hold_command_pending_ = true;
       response.success = false;
-      response.message = "Enable rejected: " + reason;
+      response.message = "启用请求被拒绝：" + reason;
       return true;
     };
 
     if (!have_joint_state_ || !have_base_pose_ || !have_target_point_)
     {
-      return reject_enable("joint_states, base_pose and target_point are all required");
+      return reject_enable("必须同时收到 joint_states、base_pose 和 target_point");
     }
     if (latest_base_pose_.header.frame_id != absolute_frame_ ||
         latest_target_point_.header.frame_id != absolute_frame_)
     {
-      return reject_enable("base_pose and target_point must use absolute_frame=" +
+      return reject_enable("基座位姿和目标点必须使用绝对坐标系 absolute_frame=" +
                            absolute_frame_);
     }
 
@@ -385,7 +385,7 @@ bool QPCartesianController::enableCallback(
         isInputStale(now, latest_target_point_.header.stamp,
                      latest_target_point_receive_time_, input_timeout_))
     {
-      return reject_enable("one or more inputs exceeded input_timeout");
+      return reject_enable("至少一类输入超过 input_timeout");
     }
 
     std::vector<double> joint_positions;
@@ -400,7 +400,7 @@ bool QPCartesianController::enableCallback(
   previous_velocity_command_.setZero();
   hold_command_pending_ = !request.data;
   response.success = true;
-  response.message = enabled_ ? "Elfin5 QP control enabled" : "Elfin5 QP control disabled";
+  response.message = enabled_ ? "Elfin5 QP 计算已启用；真机输出仍须网关独立放行" : "Elfin5 QP 计算已关闭";
   return true;
 }
 
@@ -429,7 +429,7 @@ bool QPCartesianController::extractJointPositions(
   {
     if (!std::isfinite(joint_state.position[index]))
     {
-      error_message = "joint_states contains a non-finite position";
+      error_message = "joint_states 中的关节位置不是有限数值";
       return false;
     }
     positions_by_name[joint_state.name[index]] = joint_state.position[index];
@@ -441,7 +441,7 @@ bool QPCartesianController::extractJointPositions(
     const auto iterator = positions_by_name.find(joint_names_[index]);
     if (iterator == positions_by_name.end())
     {
-      error_message = "joint_states does not contain " + joint_names_[index];
+      error_message = "joint_states 缺少关节：" + joint_names_[index];
       return false;
     }
     joint_positions[index] = iterator->second;
@@ -479,8 +479,8 @@ bool QPCartesianController::computeKinematics(
     return false;
   }
   // MoveIt返回的Jacobian表达在规划组首关节父链接中。Elfin5模型中该链接为
-  // elfin_base，而接口约定的base_link默认为elfin_base_link；二者绕Z轴相差
-  // 90度。这里只旋转速度坐标轴，使Jv与位置误差处于完全相同的base_link坐标系。
+  // elfin_base，而接口基座默认为 elfin_base_link；实际固定变换从当前模型读取，
+  // 不假定相差 90 度。这里只旋转速度坐标轴，使 Jv 与位置误差处于同一基座坐标系。
   const Eigen::Matrix3d model_from_jacobian_rotation =
       robot_state_->getGlobalLinkTransform(jacobian_reference_link_model_).linear();
   const Eigen::Matrix3d base_from_jacobian_rotation =
@@ -775,7 +775,7 @@ void QPCartesianController::controlTimerCallback(const ros::TimerEvent& event)
   std::unique_lock<std::mutex> control_lock(control_mutex_, std::try_to_lock);
   if (!control_lock.owns_lock())
   {
-    ROS_WARN_THROTTLE(1.0, "Skipped an overlapping control cycle");
+    ROS_WARN_THROTTLE(1.0, "跳过与上一周期重叠的控制周期");
     return;
   }
 
@@ -808,7 +808,7 @@ void QPCartesianController::controlTimerCallback(const ros::TimerEvent& event)
   if (!have_joint_state)
   {
     publishDiagnostics(ControllerState::WAITING_FOR_INPUT,
-                       "Waiting for joint_states", 0.0, 0.0, now);
+                       "等待关节反馈 joint_states", 0.0, 0.0, now);
     return;
   }
 
@@ -829,7 +829,7 @@ void QPCartesianController::controlTimerCallback(const ros::TimerEvent& event)
   {
     publishZeroVelocityHold(positions);
     publishDiagnostics(ControllerState::WAITING_FOR_INPUT,
-                       "Waiting for base_pose", 0.0, 0.0, now);
+                       "等待基座位姿 base_pose", 0.0, 0.0, now);
     return;
   }
 
@@ -841,7 +841,7 @@ void QPCartesianController::controlTimerCallback(const ros::TimerEvent& event)
   {
     publishZeroVelocityHold(positions);
     publishDiagnostics(ControllerState::STALE_INPUT,
-                       "joint_states or base_pose exceeded input_timeout",
+                       "关节反馈或基座位姿超过 input_timeout",
                        0.0, 0.0, now);
     return;
   }
@@ -850,7 +850,7 @@ void QPCartesianController::controlTimerCallback(const ros::TimerEvent& event)
   {
     publishZeroVelocityHold(positions);
     publishDiagnostics(ControllerState::INVALID_INPUT,
-                       "base_pose must use absolute_frame=" + absolute_frame_,
+                       "基座位姿必须使用绝对坐标系 absolute_frame=" + absolute_frame_,
                        0.0, 0.0, now);
     return;
   }
@@ -861,7 +861,7 @@ void QPCartesianController::controlTimerCallback(const ros::TimerEvent& event)
   {
     publishZeroVelocityHold(positions);
     publishDiagnostics(ControllerState::QP_INFEASIBLE,
-                       "Failed to compute kinematics", 0.0, 0.0, now);
+                       "运动学计算失败", 0.0, 0.0, now);
     return;
   }
 
@@ -872,12 +872,14 @@ void QPCartesianController::controlTimerCallback(const ros::TimerEvent& event)
   {
     publishZeroVelocityHold(positions);
     publishDiagnostics(ControllerState::INVALID_INPUT,
-                       "Kinematics produced a non-finite value", 0.0, 0.0, now);
+                       "运动学计算产生非有限数值", 0.0, 0.0, now);
     return;
   }
 
   // current_point和奇异值属于只读监控量，在enable之前也持续发布。首次实验应先
   // 记录这两个值，再把目标设置到current_point附近，最后才允许运动。
+  // world_from_base 表示基座到配置绝对系的刚体变换：真机为 absolute_world，仿真为 world。
+  // 保留完整厂家模型后，相对基座的 FK 和 Jacobian 计算不变，不重复叠加模型根变换。
   const Eigen::Isometry3d world_from_base = poseToIsometry(base_pose.pose);
   geometry_msgs::PointStamped current_point_message;
   current_point_message.header.stamp = now;
@@ -901,7 +903,7 @@ void QPCartesianController::controlTimerCallback(const ros::TimerEvent& event)
       publishZeroVelocityHold(positions);
       hold_command_pending_ = false;
     }
-    publishDiagnostics(ControllerState::IDLE, "Enable service is false",
+    publishDiagnostics(ControllerState::IDLE, "计算开关处于关闭状态",
                        0.0, minimum_singular_value, now);
     return;
   }
@@ -910,7 +912,7 @@ void QPCartesianController::controlTimerCallback(const ros::TimerEvent& event)
   {
     publishZeroVelocityHold(positions);
     publishDiagnostics(ControllerState::WAITING_FOR_INPUT,
-                       "Waiting for target_point", 0.0,
+                       "等待目标点 target_point", 0.0,
                        minimum_singular_value, now);
     return;
   }
@@ -921,7 +923,7 @@ void QPCartesianController::controlTimerCallback(const ros::TimerEvent& event)
   {
     publishZeroVelocityHold(positions);
     publishDiagnostics(ControllerState::STALE_INPUT,
-                       "target_point exceeded input_timeout", 0.0,
+                       "目标点超过 input_timeout", 0.0,
                        minimum_singular_value, now);
     return;
   }
@@ -929,7 +931,7 @@ void QPCartesianController::controlTimerCallback(const ros::TimerEvent& event)
   {
     publishZeroVelocityHold(positions);
     publishDiagnostics(ControllerState::INVALID_INPUT,
-                       "target_point must use absolute_frame=" + absolute_frame_,
+                       "目标点必须使用绝对坐标系 absolute_frame=" + absolute_frame_,
                        0.0, minimum_singular_value, now);
     return;
   }
@@ -945,7 +947,7 @@ void QPCartesianController::controlTimerCallback(const ros::TimerEvent& event)
   {
     publishZeroVelocityHold(positions);
     publishDiagnostics(ControllerState::INVALID_INPUT,
-                       "Target transform produced a non-finite value", 0.0,
+                       "目标坐标变换产生非有限数值", 0.0,
                        minimum_singular_value, now);
     return;
   }
@@ -955,7 +957,7 @@ void QPCartesianController::controlTimerCallback(const ros::TimerEvent& event)
   if (position_error <= goal_tolerance_)
   {
     publishZeroVelocityHold(positions);
-    publishDiagnostics(ControllerState::REACHED, "Target tolerance reached",
+    publishDiagnostics(ControllerState::REACHED, "末端位置误差已进入目标容差",
                        position_error, minimum_singular_value, now);
     return;
   }
@@ -991,7 +993,7 @@ void QPCartesianController::controlTimerCallback(const ros::TimerEvent& event)
     // 只有局部不存在提高最小奇异值的方向时才停止。
     publishZeroVelocityHold(positions);
     publishDiagnostics(ControllerState::SINGULARITY_STOP,
-                       "No local direction can increase the minimum singular value",
+                       "当前局部方向无法提高最小奇异值",
                        position_error, minimum_singular_value, now);
     return;
   }
@@ -1015,7 +1017,7 @@ void QPCartesianController::controlTimerCallback(const ros::TimerEvent& event)
   {
     publishZeroVelocityHold(positions);
     publishDiagnostics(ControllerState::QP_INFEASIBLE,
-                       "Joint position/velocity/acceleration bounds conflict",
+                       "关节位置、速度或加速度约束相互冲突",
                        position_error, minimum_singular_value, now);
     return;
   }

@@ -64,12 +64,12 @@ QPSolution BoxQPSolver::solve(
       lower_bound.size() != dimension || upper_bound.size() != dimension ||
       initial_guess.size() != dimension)
   {
-    result.message = "QP dimensions are inconsistent";
+    result.message = "QP 矩阵或向量维度不一致";
     return result;
   }
   if (halfspace_normal != nullptr && halfspace_normal->size() != dimension)
   {
-    result.message = "QP half-space dimension is inconsistent";
+    result.message = "QP 半空间约束维度不一致";
     return result;
   }
   if (!hessian.allFinite() || !gradient.allFinite() ||
@@ -77,17 +77,17 @@ QPSolution BoxQPSolver::solve(
       !initial_guess.allFinite() || !std::isfinite(halfspace_offset) ||
       (halfspace_normal != nullptr && !halfspace_normal->allFinite()))
   {
-    result.message = "QP input contains a non-finite value";
+    result.message = "QP 输入包含非有限数值";
     return result;
   }
   if (max_iterations_ <= 0 || !std::isfinite(tolerance_) || tolerance_ <= 0.0)
   {
-    result.message = "QP solver configuration is invalid";
+    result.message = "QP 求解器配置无效";
     return result;
   }
   if ((lower_bound.array() > upper_bound.array()).any())
   {
-    result.message = "QP bounds are infeasible";
+    result.message = "QP 上下界不可行";
     return result;
   }
 
@@ -95,7 +95,7 @@ QPSolution BoxQPSolver::solve(
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> eigen_solver(symmetric_hessian);
   if (eigen_solver.info() != Eigen::Success || eigen_solver.eigenvalues().minCoeff() <= 0.0)
   {
-    result.message = "QP Hessian is not positive definite";
+    result.message = "QP Hessian 矩阵不是正定矩阵";
     return result;
   }
 
@@ -127,7 +127,7 @@ QPSolution BoxQPSolver::solve(
       halfspace_normal->dot(x) + 1e-7 < halfspace_offset)
   {
     result.x = x;
-    result.message = "Singularity half-space and joint bounds are infeasible";
+    result.message = "奇异性半空间与关节上下界无法同时满足";
     return result;
   }
 
@@ -140,17 +140,17 @@ QPSolution BoxQPSolver::solve(
   result.x = x;
   if (!result.success)
   {
-    result.message = "QP returned an invalid or infeasible solution";
+    result.message = "QP 返回无效解或不可行解";
   }
   else if (result.converged)
   {
-    result.message = "QP converged";
+    result.message = "QP 已收敛";
   }
   else
   {
     // 可行但未收敛的速度仍满足安全边界，可以作为降级结果使用；上层控制器
     // 会发布 QP_DEGRADED，而不是将它误报成完全求解成功。
-    result.message = "QP iteration limit reached with a feasible solution";
+    result.message = "QP 已达到迭代次数上限，当前解可行但尚未收敛";
   }
   return result;
 }

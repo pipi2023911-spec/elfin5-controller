@@ -1,11 +1,11 @@
 /*
  * real_robot_monitor_node.cpp
  * Elfin5 真机只读监视节点：把真实反馈转换为 RViz 可显示、可录包的观测数据。
- * 输入：真实 JointState、world 中的 base_pose 和 target_point、JTC state，以及网关/QP状态。
+ * 输入：真实 JointState、absolute_world 中的 base_pose 和 target_point、JTC state，以及网关/QP状态。
  * 末端估计：p_W = T_WB * p_B(q_actual)；E = ||p_target_W − p_W||，单位 m。
  * 关节误差：同一条 JTC state 中的 desired.positions − actual.positions，单位 rad。
  * 输出：当前 TCP、标量误差/有效性诊断、六关节误差、RViz标记和有界历史轨迹。
- * TF 模式：pose 由本节点发布 world→base；external 只核对已有 TF 与输入位姿的一致性。
+ * TF 模式：pose 发布 absolute_world→world；external 核对厂家 TF 链与输入位姿的一致性。
  * 这里不发送运动命令、不写日志文件；原始消息由独立 rosbag 记录，后续脚本负责导出图表。
  * 时间对齐采用限差内最近基座样本和不晚于关节采样的目标，不宣称严格同时测量。
  * 主循环使用 ros::spin() 顺序执行本节点回调，避免并发修改 MoveIt RobotState 和样本队列。
@@ -42,7 +42,7 @@
 
 namespace eq=elfin5_qp_controller;
 class RealMonitor {
-  // n_ 查找命名空间内的机器人模型和共享话题；p_ 存放 monitor 参数和输出。
+  // n_ 访问共享话题；模型显式使用厂家全局参数；p_ 存放 monitor 参数和输出。
   ros::NodeHandle n_,p_{"~"};
   ros::Subscriber joints_,base_,target_,controller_,bridge_,qp_,tf_,tf_static_;
   ros::Publisher error_,point_,diagnostic_,markers_,path_,joint_errors_;
@@ -51,7 +51,7 @@ class RealMonitor {
   // TF Buffer 供 external 模式按测量时间查询；监听器维护 TF 缓存，不重新解释关节反馈。
   tf2_ros::Buffer buffer_;
   tf2_ros::TransformListener listener_{buffer_};
-  robot_model_loader::RobotModelLoader loader_{"robot_description"};
+  robot_model_loader::RobotModelLoader loader_{"/robot_description"};
   moveit::core::RobotModelPtr model_;
   std::unique_ptr<moveit::core::RobotState> state_;
   std::vector<std::string> names_;
@@ -61,7 +61,7 @@ class RealMonitor {
   nav_msgs::Path trail_;  // 有限长度的历史位置轨迹，不是待执行规划轨迹。
   // 最近一次有效 TCP，仅用于放置诊断文字；失效时不能当成新的测量点发布。
   geometry_msgs::Point display_point_;
-  std::string world_,base_link_,tip_,bridge_state_="OBSERVE",qp_state_="UNKNOWN",tf_mode_;
+  std::string world_,model_root_,base_link_,tip_,bridge_state_="OBSERVE",qp_state_="UNKNOWN",tf_mode_;
   double timeout_,skew_,base_tf_position_tolerance_,base_tf_angle_tolerance_;
   int max_points_;
   ros::WallTime joint_receive_;  // 接收墙钟用于检测关节话题停止更新。
@@ -113,20 +113,20 @@ class RealMonitor {
       marker.action=visualization_msgs::Marker::ADD;marker.pose.position=display_point_;
       marker.pose.position.z+=0.1;marker.pose.orientation.w=1;marker.scale.z=0.035;
       marker.color.r=1;marker.color.a=1;marker.lifetime=ros::Duration(std::max(0.5,timeout_));
-      marker.text="INVALID / STALE: "+why+"\n"+bridge_state_;
+      marker.text="无效或过期："+why+"\n"+bridge_state_;
       array.markers.push_back(marker);markers_.publish(array);
     }
   }
-  // pose 模式下检测其他节点给 base_link_ 提供父变换；包含 /tf 与 /tf_static。
+  // pose 模式下仅监视模型根 world 的竞争发布；厂家 world→base 是正常内部 TF。
   // 忽略自己的发布，发现竞争来源后锁存 conflict_，需整理发布者并重启。
   void onTF(const ros::MessageEvent<tf2_msgs::TFMessage const>& event) {
     if(tf_mode_!="pose" || event.getPublisherName()==ros::this_node::getName())return;
     for(const auto& t:event.getMessage()->transforms)
-      if(t.child_frame_id==base_link_) {
-        conflict_=true;ROS_ERROR_THROTTLE(2,"Duplicate base TF: stop other publisher and restart monitor");
+      if(t.child_frame_id==model_root_) {
+        conflict_=true;ROS_ERROR_THROTTLE(2,"模型根 world 的 TF 存在竞争发布者，请整理发布源后重启监视器");
       }
   }
-  // 检查坐标系、递增时间、有限位置和四元数，缓存真实的 world→base 位姿。
+  // 缓存基座在绝对系中的真实位姿；world→base 为单位变换，故可直接赋给绝对系→world。
   void onBase(const geometry_msgs::PoseStamped::ConstPtr& m) {
     const auto& q=m->pose.orientation;const double norm=q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w;
     base_valid_=m->header.frame_id==world_ && fresh(m->header.stamp) &&
@@ -137,13 +137,13 @@ class RealMonitor {
     last_base_=m->header.stamp;bases_.push_back(*m);if(bases_.size()>500)bases_.pop_front();
     // 只在唯一发布者模式下广播，并保留定位源的原时间戳，不能改写为 now。
     if(tf_mode_=="pose" && !conflict_) {
-      geometry_msgs::TransformStamped t;t.header=m->header;t.child_frame_id=base_link_;
+      geometry_msgs::TransformStamped t;t.header=m->header;t.child_frame_id=model_root_;
       t.transform.translation.x=m->pose.position.x;t.transform.translation.y=m->pose.position.y;
       t.transform.translation.z=m->pose.position.z;t.transform.rotation=m->pose.orientation;
       broadcaster_.sendTransform(t);
     }
   }
-  // 目标同样必须来自 world；不在这里转换成 base，以免重复变换。
+  // 目标同样必须来自绝对系；不在这里转换成 base，以免重复变换。
   void onTarget(const geometry_msgs::PointStamped::ConstPtr& m) {
     target_valid_=m->header.frame_id==world_ && finite(m->point) &&
                   fresh(m->header.stamp) && m->header.stamp>last_target_;
@@ -161,7 +161,7 @@ class RealMonitor {
   // 关节误差独立于末端 FK：从同一条 state 取参考与实际位置，再按名称对应。
   // 保留有符号直接差；不自动做角度取模，以免隐藏有限位关节的分支/零位问题。
   void onController(const control_msgs::JointTrajectoryControllerState::ConstPtr& m) {
-    // Same stamp, name map and signed direct difference. Never use future QP endpoint.
+    // 使用同一时间戳、名称映射和有符号差值，不使用未来的 QP 端点。
     // 这里复用 JointState 容器装误差，position 的物理含义是角度差，绝非机器人实际角度。
     sensor_msgs::JointState out;out.header=m->header;out.name=names_;
     std::vector<double> desired,actual;
@@ -174,7 +174,7 @@ class RealMonitor {
       for(std::size_t i=0;i<names_.size();++i)out.position.push_back(desired[i]-actual[i]);
     // 不合格样本输出六个 NaN，让下游可显式识别无效值，而不是画出虚假的零误差。
     } else out.position.assign(names_.size(),std::numeric_limits<double>::quiet_NaN());
-    // A labelled error topic, never remapped into robot_state_publisher.
+    // 专用误差话题，绝不能重映射到 robot_state_publisher。
     joint_errors_.publish(out);
   }
   // 末端估计以真实关节采样触发；任一输入缺失、过期或 TF 冲突时仅报告无效。
@@ -183,11 +183,11 @@ class RealMonitor {
     std::vector<double> q;
     if(!fresh(m->header.stamp) || m->header.stamp<=last_joint_ ||
        !eq::orderedPositions(names_,m->name,m->position,q)) {
-      report(ros::Time::now(),false,"invalid_joint_feedback");return;
+      report(ros::Time::now(),false,"关节反馈无效");return;
     }
     last_joint_=m->header.stamp;
     if(!base_valid_ || !target_valid_ || bases_.empty() || targets_.empty() || conflict_) {
-      report(m->header.stamp,false,"missing_input_or_tf_conflict");return;
+      report(m->header.stamp,false,"输入缺失、无效或存在 TF 冲突");return;
     }
     // 遍历有界缓存选择时间差最小的基座样本；它可能稍早或稍晚，但必须在 skew_ 范围内。
     const geometry_msgs::PoseStamped* b=nullptr;
@@ -203,18 +203,18 @@ class RealMonitor {
     // 最近样本仍可能太远或已过期；未满足条件时不插值、不补零、不发布新的TCP位置。
     if(!b || nearest>skew_ || !fresh(b->header.stamp) ||
        !target || !fresh(target->header.stamp)) {
-      report(m->header.stamp,false,"unaligned_or_stale_base_target");return;
+      report(m->header.stamp,false,"基座与目标时间未对齐或已过期");return;
     }
-    // wb 是基座到 world 的刚体变换；后面的乘法方向与输入定义保持一致。
+    // wb 是基座到 absolute_world 的刚体变换，方向与输入定义保持一致。
     const auto wb=transform(b->pose);
     // external 模式不广播基座 TF，而是要求外部 TF 在同一定位时间能查到且与 base_pose 一致。
     if(tf_mode_=="external") {
       try {
         // 零等待查询避免关节回调阻塞；此时查不到就报无效，等下一帧再处理。
         const auto t=buffer_.lookupTransform(world_,base_link_,b->header.stamp,ros::Duration(0));
-        // 拒绝只由静态变换组成的基座结果，避免把移动基座错误固定在 world。
+        // 拒绝只有静态变换的查询结果，避免把移动基座错误固定在绝对系。
         if(t.header.stamp.isZero() || std::abs((t.header.stamp-b->header.stamp).toSec())>skew_) {
-          report(m->header.stamp,false,"external_base_tf_not_dynamic_or_aligned");return;
+          report(m->header.stamp,false,"外部基座 TF 不是动态变换或时间未对齐");return;
         }
         geometry_msgs::Pose p;p.position.x=t.transform.translation.x;
         p.position.y=t.transform.translation.y;p.position.z=t.transform.translation.z;
@@ -222,18 +222,18 @@ class RealMonitor {
         const auto check=transform(p);
         if((check.translation()-wb.translation()).norm()>base_tf_position_tolerance_ ||
            Eigen::AngleAxisd(check.linear().transpose()*wb.linear()).angle()>base_tf_angle_tolerance_)
-          {report(m->header.stamp,false,"external_tf_base_pose_mismatch");return;}
+          {report(m->header.stamp,false,"外部 TF 与基座位姿不一致");return;}
       } catch(const tf2::TransformException&) {
-        report(m->header.stamp,false,"external_tf_unavailable");return;
+        report(m->header.stamp,false,"无法查询外部 TF");return;
       }
     }
     // 向 MoveIt 写入真实关节位置并更新 FK；没有使用候选或期望关节位置。
     state_->setVariablePositions(names_,q);state_->update();
     // 先用 T_model_base 的逆左乘 T_model_tip，得到相对 base_link_ 的 TCP。
-    // 因此厂家 base_link→elfin_base 的固定旋转只由模型计算一次，不再手工叠加90°。
+    // 厂家内部固定变换只由模型计算一次，不手工假定或叠加固定旋转。
     const Eigen::Vector3d local=(state_->getGlobalLinkTransform(base_link_).inverse() *
                                 state_->getGlobalLinkTransform(tip_)).translation();
-    // 将基座坐标 TCP 转到固定 world；包含基座旋转和平移的共同影响。
+    // 将基座坐标 TCP 转到固定 absolute_world，包含基座旋转和平移的共同影响。
     const Eigen::Vector3d position=wb*local;
     const Eigen::Vector3d goal(target->point.x,target->point.y,target->point.z);
     // 只输出位置误差的二范数，不生成 XYZ 三分量误差曲线。
@@ -243,7 +243,7 @@ class RealMonitor {
     display_point_=current.point;
     // 当前位置沿用关节采样时间；误差诊断另保存所选基座/目标时间，说明它是估计结果。
     point_.publish(current);std_msgs::Float64 scalar;scalar.data=e;error_.publish(scalar);
-    report(m->header.stamp,true,"estimated_from_joint_and_base",e,
+    report(m->header.stamp,true,"由真实关节反馈和基座定位估计",e,
            b->header.stamp.toSec(),target->header.stamp.toSec());
     // Path 仅用来显示位置历史，orientation.w=1 是显示占位，不代表控制/测量了末端姿态。
     geometry_msgs::PoseStamped pose;pose.header=current.header;pose.pose.position=current.point;
@@ -290,12 +290,13 @@ class RealMonitor {
     last_clock_=now;
     if(joint_receive_.isZero() || (ros::WallTime::now()-joint_receive_).toSec()>timeout_ ||
        !fresh(last_base_) || !fresh(last_target_))
-      report(now,false,"feedback_timeout");
+      report(now,false,"反馈超时");
   }
 public:
   // 读取坐标系/时效配置并加载同一个硬件模型；配置不合格时启动失败，不带病显示。
   RealMonitor() {
-    p_.param<std::string>("world_frame",world_,"world");
+    p_.param<std::string>("world_frame",world_,"absolute_world");
+    p_.param<std::string>("model_root_frame",model_root_,"world");
     p_.param<std::string>("base_link",base_link_,"elfin_base_link");
     p_.param<std::string>("tip_link",tip_,"elfin_end_link");
     p_.param<std::string>("base_tf_mode",tf_mode_,"pose");
@@ -311,13 +312,30 @@ public:
        !std::isfinite(timeout_) || timeout_<=0 || !std::isfinite(skew_) || skew_<=0 ||
        !std::isfinite(base_tf_position_tolerance_) || base_tf_position_tolerance_<=0 ||
        !std::isfinite(base_tf_angle_tolerance_) || base_tf_angle_tolerance_<=0 ||
-       max_points_<1)throw std::runtime_error("Invalid monitor configuration/model");
+       max_points_<1)throw std::runtime_error("监视器配置或机器人模型无效");
     // 逐个确认配置名称存在于模型变量中；避免 setVariablePositions 时错误匹配。
     const auto& variables=model_->getVariableNames();
     for(const auto& name:names_)if(std::find(variables.begin(),variables.end(),name)==variables.end())
-      throw std::runtime_error("Unknown joint variable: "+name);
+      throw std::runtime_error("未知关节变量："+name);
     // 默认状态只用于初始化模型；实际发布TCP前必须收到并写入真实六轴位置。
     state_.reset(new moveit::core::RobotState(model_));state_->setToDefaultValues();
+    // 复用原有模型准入：根到基座必须是固定单位变换，才能把 base_pose 用作根的位姿。
+    // 这里不修改模型，也不增加控制状态；不满足契约时拒绝产生含义错误的显示 TF。
+    if(world_.empty() || world_==model_root_ || model_->hasLinkModel(world_) ||
+       model_->getRootLink()->getName()!=model_root_)
+      throw std::runtime_error("绝对坐标系必须位于模型外，模型根必须与 model_root_frame 一致");
+    const auto* link=model_->getLinkModel(base_link_);
+    while(link && link->getName()!=model_root_) {
+      const auto* joint=link->getParentJointModel();
+      if(!joint || joint->getType()!=moveit::core::JointModel::FIXED)
+        throw std::runtime_error("模型根到基座必须全部由固定关节连接");
+      link=joint->getParentLinkModel();
+    }
+    state_->update();
+    const Eigen::Isometry3d root_base=state_->getGlobalLinkTransform(model_root_).inverse() *
+                                      state_->getGlobalLinkTransform(base_link_);
+    if(!link || !root_base.matrix().isApprox(Eigen::Matrix4d::Identity(),1e-12))
+      throw std::runtime_error("模型 world 与基座必须重合；请核对厂家原始模型，不要删除固定连接");
     point_=p_.advertise<geometry_msgs::PointStamped>("current_point",1);
     error_=p_.advertise<std_msgs::Float64>("tracking_error",1);
     diagnostic_=p_.advertise<diagnostic_msgs::DiagnosticArray>("tracking_state",20);
@@ -331,13 +349,13 @@ public:
     controller_=n_.subscribe(topic("controller_state_topic","/elfin_arm_controller/state"),20,&RealMonitor::onController,this);
     bridge_=n_.subscribe("bridge/state",1,&RealMonitor::onBridge,this);
     qp_=n_.subscribe("qp_candidate/state",1,&RealMonitor::onQP,this);
-    // 同时监听动态/静态TF，识别厂家固定world模型仍在运行的冲突情况。
+    // 复用厂家所在的 /tf 和 /tf_static；只检测模型根 world 的竞争来源。
     tf_=n_.subscribe("/tf",50,&RealMonitor::onTF,this);
     tf_static_=n_.subscribe("/tf_static",50,&RealMonitor::onTF,this);
     watchdog_=n_.createWallTimer(ros::WallDuration(0.2),&RealMonitor::tick,this);
   }
 };
-// 使用顺序 ROS 回调维护 FK 和缓存的一致性；初始化异常使 required 节点退出。
+// 顺序回调维护 FK 与缓存一致性；初始化异常仅退出监视节点，不能替代硬件停止。
 int main(int argc,char** argv) {
   ros::init(argc,argv,"real_robot_monitor");
   try {RealMonitor monitor;ros::spin();}

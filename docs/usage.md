@@ -27,7 +27,7 @@ catkin_make run_tests_elfin5_qp_controller
 catkin_test_results build/test_results
 ```
 
-上述测试包含纯 C++ 检查、Python 模型/误差检查和合成数据的 ROS 接线测试。不要将接线测试节点直接运行到真机 master。仅运行不依赖 ROS 的 Python 检查可使用 `python "$(rospack find elfin5_qp_controller)/test/test_real_robot_tf_and_error.py" -v`。
+上述测试包含纯 C++ 检查、Python 模型/误差检查和合成数据的 ROS 接线测试。接线夹具新增了真实 monitor 与 robot_state_publisher，检查平移/旋转后的 TCP、正确的根 TF 及竞争发布检测；这些 ROS 用例须在 Melodic 环境执行。不要将接线测试节点直接运行到真机 master。仅运行不依赖 ROS 的 Python 检查可使用 `python "$(rospack find elfin5_qp_controller)/test/test_real_robot_tf_and_error.py" -v`。
 
 仿真入口为 `roslaunch elfin5_qp_controller elfin5_qp_gazebo.launch`，仅用于隔离的仿真环境。
 
@@ -47,15 +47,53 @@ rostopic echo -n 1 /base_pose
 rostopic echo -n 1 /target_point
 ```
 
-真机使用真实时钟（`/use_sim_time=false`，未设置时默认为 false）。基座位姿和目标均为 world 坐标，并持续提供有效源时间戳；各设备时钟须同步。清理仿真反馈、竞争的轨迹/action 发布源，以及重复的固定 world 模型 TF 发布器。
+真机使用真实时钟（`/use_sim_time=false`，未设置时默认为 false）。基座位姿和目标均为 absolute_world 坐标，并持续提供有效源时间戳；各设备时钟须同步。清理仿真反馈、竞争的轨迹/action 发布源，以及 QP 旧版本的模型发布器。保留厂家 bringup 的唯一 robot_state_publisher，不删除其 world_base 固定关系。
+
+在已确认厂家启动行为和现场条件后，先运行厂家的模型入口，再运行本包入口（两个终端都先加载工作空间）：
 
 ```bash
+# 终端一：完整厂家模型和唯一的模型 TF 发布器
+roslaunch elfin_robot_bringup elfin5_bringup.launch
+```
+
+已核对的 `elfin_robot-melodic_ethercat` 中，`elfin5_bringup.launch` 只加载 URDF 和启动 robot_state_publisher，本身不启动 EtherCAT 驱动或 JTC。真实反馈与控制器仍须由现场已核验的硬件入口提供；不要把模型显示成功当作驱动已运行。
+
+确认厂家 `/robot_description` 已加载后，在终端二启动：
+
+```bash
+rosparam get /robot_description | head -n 5
 roslaunch elfin5_qp_controller elfin5_qp_real_robot.launch
 ```
 
-若定位系统已有动态基座 TF，改用 `base_tf_mode:=external`，仍须提供 base_pose。两种 TF 模式二选一；pose 模式检测到重复发布者后需整理 TF 发布源并重启。
+从旧版更新时，先退出旧 QP launch。旧站点配置请同步设置以下四项；基座及目标的坐标源也要使用固定的 `absolute_world`，不要向它们发送模型内随动的 `world` 坐标：
 
-RViz 默认以 world 为固定坐标系，显示真实反馈驱动的模型、目标、估计 TCP 和误差。观察 `/elfin5_real/bridge/state`、`/elfin5_real/monitor/tracking_state`，并核对 TF、关节方向和现场几何。显示正常不能代替硬件状态或停止确认；监视器/RViz 失效也不会单独停止控制。
+```yaml
+bridge:
+  world_frame: absolute_world
+monitor:
+  world_frame: absolute_world
+  model_root_frame: world
+qp_candidate:
+  absolute_frame: absolute_world
+```
+
+这些是对原站点 YAML 的合并修改，其他限值和保护配置保留。默认 pose 模式会把基座位姿发布为 `absolute_world → world`；模型内部 TF 全部来自厂家 bringup。
+
+
+若定位系统已经发布动态 `absolute_world → world`，改用 `base_tf_mode:=external`，仍须提供 base_pose。两种 TF 模式二选一；pose 模式检测到重复发布者后需整理 TF 发布源并重启。
+
+RViz 默认以 absolute_world 为固定坐标系，显示真实反馈驱动的模型、目标、估计 TCP 和误差。观察 `/elfin5_real/bridge/state`、`/elfin5_real/monitor/tracking_state`，并核对 TF、关节方向和现场几何。显示正常不能代替硬件状态或停止确认；监视器/RViz 失效也不会单独停止控制。
+
+只读核对完整 TF 链：
+
+```bash
+rosrun tf tf_echo absolute_world world
+rosrun tf tf_echo world elfin_base_link
+rosrun tf tf_echo absolute_world elfin_end_link
+rosnode info /robot_state_publisher
+```
+
+第二条应始终是零平移、单位旋转；第一条应与真实 base_pose 一致。基座移动时厂家 world 和机器人模型应整体在 RViz 中移动。external 模式要求同一条动态根变换，不能直接另发 absolute_world 到 elfin_base_link，造成基座双父关系。没有定位输入时应排查定位来源，不用固定零位姿冒充移动基座反馈。
 
 ## 3. 记录数据与影子计算
 
@@ -133,7 +171,7 @@ rosrun elfin5_qp_controller plot_real_robot_error.py /path/to/experiment.bag \
 
 ## 当前验证范围与待核实参数
 
-已有 11 项 Python 离线检查通过。完整 ROS 编译、ROS 隔离测试及真机实验尚未完成，不能以源码检查替代这些验证。
+本次 14 项 Python 模型/误差/启动配置检查通过。19 项纯 C++ 命令检查断言通过；提取实际网关状态方法及 monitor 的 onTF/onBase 回调，在时钟、服务和消息桩下编译运行通过，覆盖人工放行/停止/复位、故障锁存、正常厂家 TF、根竞争和 external 模式不广播。这些桩测试不等于 ROS 节点集成测试。完整 ROS 编译、ROS 隔离测试及真机实验尚未完成，不能以源码检查替代这些验证。
 
 截至当前，只有厂家源码，尚无 joint_states、JTC state、base_pose 的实测发布周期/最大延迟，以及厂家停止/看门狗说明。以下保留值均未通过现场核验，不是已确认的安全阈值：
 

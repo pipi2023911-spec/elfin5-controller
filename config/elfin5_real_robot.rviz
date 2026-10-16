@@ -11,7 +11,7 @@ Visualization Manager:
   Global Options:
     Background Color: 40; 40; 40
     # 所有空间显示都在不移动的world中，不能改成base来掩盖基座运动。
-    Fixed Frame: world
+    Fixed Frame: absolute_world
     Frame Rate: 30
   Displays:
     - Class: rviz/Grid
@@ -23,7 +23,7 @@ Visualization Manager:
       Name: Real robot feedback
       Enabled: true
       # 专用参数避免覆盖厂家全局模型；TF链接名称仍需在系统中保持唯一。
-      Robot Description: /elfin5_real/robot_description
+      Robot Description: /robot_description
       Visual Enabled: true
       Collision Enabled: false
       TF Prefix: ""

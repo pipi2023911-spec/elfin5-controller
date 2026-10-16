@@ -26,7 +26,7 @@ int main(int argc, char** argv)
   }
   catch (const std::exception& exception)
   {
-    ROS_FATAL_STREAM("Elfin5 QP controller initialization failed: " << exception.what());
+    ROS_FATAL_STREAM("Elfin5 QP 控制器初始化失败：" << exception.what());
     return 1;
   }
   return 0;

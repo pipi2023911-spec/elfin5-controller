@@ -2,7 +2,7 @@
 
 面向机械臂控制算法研究的 ROS 包，包含当前 V2 QP 控制器、Gazebo 仿真入口，以及通过厂家 EtherCAT 驱动和 JTC 接入真机的接口。
 
-末端只跟踪 XYZ，允许姿态变化。`world` 是固定坐标系；基座可以移动，输入基座位姿和目标点均在 `world` 中表达。
+末端只跟踪 XYZ，允许姿态变化。真机的 `absolute_world` 是固定绝对坐标系；基座可以移动，基座位姿和目标点均在该坐标系中表达。厂家模型中的 `world` 与 `elfin_base_link` 始终重合，并一起运动。仿真配置仍使用原来的 `world`。
 
 控制链：真实反馈 → QP 候选轨迹 → 硬件命令网关 → 厂家位置 JTC → RobotHW → EtherCAT。真机启动文件默认打开 RViz，支持末端位置误差范数和六个关节过程跟踪误差的记录、绘图。
 
@@ -24,9 +24,18 @@
 | `src_gazebo/`、`include/` | 现有 QP 求解器、笛卡尔控制器及接口头文件 |
 | `src/` | 真机命令网关、命令检查、只读监视 |
 | `launch/`、`config/` | 仿真/真机入口、算法和站点参数、RViz 配置 |
-| `scripts/` | 模型准备、误差绘图和仿真测试工具 |
+| `scripts/` | 完整模型离线核验、误差绘图和仿真测试工具 |
 | `test/` | 求解器、命令检查、模型/误差及 ROS 接线测试 |
 | `docs/` | 当前接口与基本使用说明 |
+
+## 本次修改（2026-10-16）
+
+- 保留厂家完整 `/robot_description` 和 `world_base`；移除 QP 真机入口中的重复 `robot_state_publisher` 和私有模型生成步骤。
+- monitor 在 pose 模式发布 `absolute_world → world`；厂家 bringup 继续发布所有模型内部 TF。external 模式由定位系统提供该动态边，monitor 只核对。
+- 真机 QP、网关、监视器与 RViz 统一使用 `absolute_world`。控制算法、关节约束、通信阈值及四状态网关逻辑保持不变。
+- 本包的运行说明、服务回复和故障原因改为中文；英文状态码、接口名称和诊断键保留，保证已有程序解析兼容。ROS、MoveIt 和厂家库自身的提示由这些组件负责。
+
+更新后先退出旧 QP 真机 launch，再启动新版；不要同时运行两版。已有站点 YAML 必须同步将 `bridge.world_frame`、`monitor.world_frame`、`qp_candidate.absolute_frame` 设为 `absolute_world`，并设置 `monitor.model_root_frame: world`。定位与目标消息的 `header.frame_id` 也须更新，坐标值应确实处于该绝对系，不能只改标签冒充坐标变换。现场步骤见[基本使用](docs/usage.md)。
 
 ## 当前使用边界
 

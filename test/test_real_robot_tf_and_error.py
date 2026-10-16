@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # 不依赖ROS运行环境的模型、误差和接线静态检查。
 # 直接加载两个新增脚本的纯函数，不导入rosbag，也不启动任何机械臂节点。
-# URDF使用最小结构夹具，验证移除world锚点时保留厂家内部90°固定旋转。
+# URDF使用最小结构夹具，验证保留 world 锚点和厂家原始内部固定旋转。
 # 误差测试覆盖名称映射、符号、NaN、缺失段、角度分支及ACTIVE阶段覆盖率。
 # launch检查只证明文本中的重映射存在；真实ROS图隔离另由rostest验证。
 # 本文件的PASS不能解释为完整模型、运动学或真机验收通过。
@@ -34,19 +34,32 @@ XML = """<robot name="test"><link name="world"/><link name="elfin_base_link"/><l
 <joint name="elfin_base_joint" type="fixed"><parent link="elfin_base_link"/><child link="elfin_base"/><origin rpy="0 0 1.5707963267948966"/></joint></robot>"""
 
 class OfflineChecks(unittest.TestCase):
-    # 确认只删世界锚点，内部固定旋转数值原样保留。
+    # 确认完整模型原样保留，包含 world 锚点及内部固定旋转。
     def test_base_rotation_preserved(self):
         root = ET.fromstring(model.prepare_urdf(XML))
-        self.assertNotIn("world",[x.get("name") for x in root.findall("link")])
-        fixed=root.find("joint")
+        self.assertIn("world",[x.get("name") for x in root.findall("link")])
+        self.assertEqual(model.prepare_urdf(XML), XML.encode("utf-8"))
+        fixed=root.findall("joint")[1]
         self.assertEqual(fixed.get("name"),"elfin_base_joint")
         self.assertAlmostEqual(float(fixed.find("origin").get("rpy").split()[2]), math.pi/2)
-    # 若world锚点不是单位变换，删除它会改变坐标含义，必须拒绝。
+    # 根与基座不重合时不能直接使用基座位姿广播根变换，必须拒绝。
     def test_nonidentity_anchor_rejected(self):
         with self.assertRaises(ValueError):model.prepare_urdf(XML.replace('xyz="0 0 0"','xyz="1 0 0"'))
-    # world若仍被其他关节引用，就不能按单一空根删除。
+    # 厂家内部基座关节的父链接不符时拒绝，不能改接到 world。
     def test_extra_world_parent_rejected(self):
         with self.assertRaises(ValueError):model.prepare_urdf(XML.replace('parent link="elfin_base_link"','parent link="world"'))
+    # 供应商版本的内部固定旋转可以不同，检查工具不得将它硬编码为 90 度。
+    def test_identity_internal_base_is_preserved(self):
+        xml=XML.replace('1.5707963267948966','0')
+        self.assertEqual(model.prepare_urdf(xml),xml.encode("utf-8"))
+    # 世界根可以带其他分支或内容；保留模型后无需旧的“空根可删除”限制。
+    def test_full_world_content_is_preserved(self):
+        xml=XML.replace('<link name="world"/>','<link name="world"><visual/></link>')
+        self.assertEqual(model.prepare_urdf(xml),xml.encode("utf-8"))
+    # 重复父关节依然是非法 URDF，保留树结构检查。
+    def test_multiple_parents_rejected(self):
+        xml=XML.replace('</robot>','<joint name="extra" type="fixed"><parent link="world"/><child link="elfin_base"/></joint></robot>')
+        with self.assertRaises(ValueError):model.prepare_urdf(xml)
     # 使用乱序名称和正负误差，检查重排与desired−actual的符号方向。
     def test_joint_name_order_and_sign(self):
         self.assertEqual(plot.joint_errors(["b","a"],[1.,2.],[1.5,1.],["a","b"]),[1.,-.5])
@@ -79,13 +92,17 @@ class OfflineChecks(unittest.TestCase):
         remaps=dict((r.get("from"),r.get("to")) for r in candidate.findall("remap"))
         self.assertEqual(remaps["/elfin_arm_controller/command"],"/elfin5_real/candidate_trajectory")
         self.assertNotEqual(remaps["/joint_states"],"/joint_states")
+        self.assertEqual(remaps["robot_description"],"/robot_description")
+        self.assertFalse(root.findall(".//param[@name='robot_description']"))
+        context=root.find(".//include/arg[@name='robot_description']")
+        self.assertEqual(context.get("value"),"/robot_description")
 
     # 观测节点默认仍启动，但退出不应通过required关闭有效控制；控制节点仍必须存活。
     def test_display_is_not_a_required_control_node(self):
         root=ET.parse(os.path.join(ROOT,"launch","elfin5_qp_real_robot.launch")).getroot()
         nodes=dict((n.get("name"),n) for n in root.findall(".//node"))
-        for name in ("monitor","robot_state_publisher"):
-            self.assertNotEqual(nodes[name].get("required"),"true")
+        self.assertNotEqual(nodes["monitor"].get("required"),"true")
+        self.assertNotIn("robot_state_publisher",nodes)
         for name in ("bridge","qp_candidate"):
             self.assertEqual(nodes[name].get("required"),"true")
 

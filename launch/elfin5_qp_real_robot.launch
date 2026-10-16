@@ -1,25 +1,21 @@
-<!-- 真机接入启动入口：复用厂家运行中的硬件链，只启动候选QP、网关、监视、模型发布和RViz。
+<!-- 真机接入启动入口：复用厂家运行中的硬件链，只启动候选QP、网关、监视和RViz。
      本文件不启动EtherCAT、不加载/切换厂家控制器，也不调用驱动使能。
      先按README完成只读检查；节点启动成功不等于已进入ACTIVE。
      elfin5_real命名空间隔离参数/业务话题，但不会自动隔离TF中的链接名称。 -->
 
 <launch>
-  <!-- No EtherCAT master, controller spawner, auto enable or vendor fault reset. -->
+  <!-- 不启动主站、控制器加载器，也不自动使能或复位厂家故障。 -->
   <!-- 用站点配置替换默认观察配置；实际限值/状态/停止接口均在该文件中定义。 -->
   <arg name="hardware_config" default="$(find elfin5_qp_controller)/config/elfin5_real_robot.yaml"/>
   <arg name="rviz" default="true"/>
   <arg name="base_tf_mode" default="pose"/>
   <group ns="elfin5_real">
-    <!-- A private model namespace leaves the vendor's global description untouched.
-         Do not run a second vendor robot_state_publisher with a fixed world joint. -->
-    <!-- 展开厂家模型后仅移除固定世界锚点，在本命名空间保存移动基座模型。
-         厂家内部固定旋转保持不变；全局robot_description参数不被覆盖。 -->
-    <param name="robot_description"
-           command="python '$(find elfin5_qp_controller)/scripts/prepare_real_robot_description.py' --xacro '$(find elfin_description)/urdf/elfin5.urdf.xacro'"/>
+    <!-- 复用 bringup 的完整 /robot_description：world 与 elfin_base_link 保持重合。
+         不生成私有模型，不删除 world_base；厂家发布器独占模型内部 TF。 -->
     <!-- 只加载SRDF、关节规划限制和运动学参数，不启动move_group执行链。 -->
     <include file="$(find elfin5_moveit_config)/launch/planning_context.launch">
       <arg name="load_robot_description" value="false"/>
-      <arg name="robot_description" value="robot_description"/>
+      <arg name="robot_description" value="/robot_description"/>
     </include>
     <!-- 先读原V2参数，再读站点参数覆盖同名项，避免复制整套算法配置。 -->
     <rosparam command="load" ns="qp_candidate" file="$(find elfin5_qp_controller)/config/elfin5_qp_controller.yaml"/>
@@ -35,18 +31,13 @@
       <remap from="~target_point" to="/elfin5_real/validated/target_point"/>
       <!-- 最关键的输出隔离：V2所有轨迹及异常hold都只到候选通道。 -->
       <remap from="/elfin_arm_controller/command" to="/elfin5_real/candidate_trajectory"/>
-      <remap from="robot_description" to="/elfin5_real/robot_description"/>
+      <remap from="robot_description" to="/robot_description"/>
     </node>
     <node pkg="elfin5_qp_controller" type="real_robot_bridge_node" name="bridge"
           output="screen" required="true"/>
     <!-- 观测节点退出只影响TF/误差显示，不关闭控制链；实验人员须据此判断数据是否可用。 -->
     <node pkg="elfin5_qp_controller" type="real_robot_monitor_node" name="monitor"
           output="screen"/>
-    <!-- 只用有效的真实关节反馈发布模型内部TF，基座动态TF由定位/monitor负责。 -->
-    <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher"
-          output="screen">
-      <remap from="joint_states" to="/elfin5_real/validated/joint_states"/>
-    </node>
     <!-- rviz参数可关闭界面，监视/误差话题仍由monitor输出。 -->
     <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz"
           args="-d $(find elfin5_qp_controller)/config/elfin5_real_robot.rviz"/>

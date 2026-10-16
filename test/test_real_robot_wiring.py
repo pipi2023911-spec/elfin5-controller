@@ -8,13 +8,15 @@
 # 该测试不验证EtherCAT通信、驱动器停车、模型精度或真实机械运动。
 
 """rostest ONLY: synthetic feedback on an isolated test master, never a real robot."""
+import math
 import threading
 import time
 import unittest
 import rospy
 import rostest
 from sensor_msgs.msg import JointState
-from geometry_msgs.msg import PoseStamped, PointStamped
+from geometry_msgs.msg import PoseStamped, PointStamped, TransformStamped
+from tf2_msgs.msg import TFMessage
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from control_msgs.msg import JointTrajectoryControllerState
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
@@ -29,6 +31,7 @@ class Wiring(unittest.TestCase):
     def setUp(self):
         self.names=["elfin_joint%d" % i for i in range(1,7)]
         self.running=True;self.send_joint=True;self.outputs=[];self.stops=0;self.mode=""
+        self.tf_edges=set();self.current_point=None;self.frame_valid=False
         self.send_monitor=False;self.hardware_level=0;self.stop_success=True
         # 两个服务只在elfin5_test下使用；stop成功回执是假的，不表示物理停车能力。
         self.services=[
@@ -36,7 +39,11 @@ class Wiring(unittest.TestCase):
             rospy.Service("/elfin5_test/stop",Trigger,self.stop)]
         self.subs=[
             rospy.Subscriber("/elfin5_test/command",JointTrajectory,self.output),
-            rospy.Subscriber("/elfin5_real/bridge/state",String,self.state)]
+            rospy.Subscriber("/elfin5_real/bridge/state",String,self.state),
+            rospy.Subscriber("/tf",TFMessage,self.transforms),
+            rospy.Subscriber("/tf_static",TFMessage,self.transforms),
+            rospy.Subscriber("/elfin5_real/frame_monitor/current_point",PointStamped,self.point),
+            rospy.Subscriber("/elfin5_real/frame_monitor/tracking_state",DiagnosticArray,self.frame_status)]
         # 保持Publisher对象存活，确保ROS图能看到测试发布者，供网关检查命令来源。
         self.pubs={}
         for key,topic,typ in [
@@ -46,6 +53,7 @@ class Wiring(unittest.TestCase):
             ("m","/elfin5_real/monitor/tracking_state",DiagnosticArray),
             ("cmd","/elfin5_real/candidate_trajectory",JointTrajectory)]:
             self.pubs[key]=rospy.Publisher(topic,typ,queue_size=1)
+        self.pubs["tf"]=rospy.Publisher("/tf",TFMessage,queue_size=1)
         # 先等网关服务注册，再创建调用代理，避免启动时序导致偶然失败。
         rospy.wait_for_service("/elfin5_real/bridge/enable",10)
         self.enable=rospy.ServiceProxy("/elfin5_real/bridge/enable",SetBool)
@@ -65,6 +73,14 @@ class Wiring(unittest.TestCase):
     def state(self,msg):self.mode=msg.data.split(":")[0]
     # 收集实际输出通道上的消息，检查禁用/锁存时是否发生候选泄漏。
     def output(self,msg):self.outputs.append(msg)
+    # 记录实际节点输出，而不是在测试中重写监视器的坐标变换算法。
+    def transforms(self,msg):
+        for t in msg.transforms:self.tf_edges.add((t.header.frame_id,t.child_frame_id))
+    def point(self,msg):self.current_point=msg
+    def frame_status(self,msg):
+        for status in msg.status:
+            if status.name=="elfin5_real_tracking":
+                self.frame_valid=dict((v.key,v.value) for v in status.values).get("valid")=="1"
     # 持续发送同一时间基准的假数据，让测试只通过send_joint开关制造反馈中断。
     def feed(self):
         while self.running and not rospy.is_shutdown():
@@ -72,8 +88,11 @@ class Wiring(unittest.TestCase):
             stamp=rospy.Time.now()-rospy.Duration(.002)
             j=JointState();j.header.stamp=stamp;j.name=self.names;j.position=[0.]*6
             if self.send_joint:self.pubs["j"].publish(j)
-            b=PoseStamped();b.header.stamp=stamp;b.header.frame_id="world";b.pose.orientation.w=1;self.pubs["b"].publish(b)
-            t=PointStamped();t.header=b.header;self.pubs["t"].publish(t)
+            b=PoseStamped();b.header.stamp=stamp;b.header.frame_id="absolute_world";b.pose.orientation.w=math.sqrt(.5)
+            b.pose.orientation.z=math.sqrt(.5)
+            b.pose.position.x=1.;b.pose.position.y=2.;b.pose.position.z=.5
+            self.pubs["b"].publish(b)
+            t=PointStamped();t.header=b.header;t.point.x=1.;t.point.y=3.;t.point.z=.5;self.pubs["t"].publish(t)
             c=JointTrajectoryControllerState();c.header.stamp=stamp;c.joint_names=self.names
             c.actual.positions=[0.]*6;c.desired.positions=[0.]*6;c.desired.velocities=[0.]*6;self.pubs["c"].publish(c)
             for key,name,identity,message in [("h","elfin5_hardware","test_robot","test_ok"),
@@ -95,12 +114,20 @@ class Wiring(unittest.TestCase):
         while time.time()<end:
             if predicate():return
             time.sleep(.03)
-        self.fail("Timed out; gate mode="+self.mode)
+        self.fail("等待超时；网关状态为："+self.mode)
     # 按完整状态转换序列验证，重点防止“数据恢复后自动执行”和历史候选泄漏。
     def test_isolation_latch_timeout_and_explicit_restart(self):
         self.wait(lambda:self.mode=="READY")
         time.sleep(.15)
-        self.assertEqual(len(self.outputs),0, "Candidate holds leaked before enable")
+        self.assertEqual(len(self.outputs),0, "显式放行前出现候选命令泄漏")
+        # 基座平移并绕 Z 旋转 90 度：夹具中的局部 TCP (1,0,0) 应变为 (1,3,0.5)。
+        self.wait(lambda:self.current_point is not None and self.frame_valid)
+        self.wait(lambda:("world","elfin_base_link") in self.tf_edges)
+        self.assertIn(("absolute_world","world"),self.tf_edges)
+        self.assertNotIn(("absolute_world","elfin_base_link"),self.tf_edges)
+        self.assertEqual(self.current_point.header.frame_id,"absolute_world")
+        for actual,expected in zip([self.current_point.point.x,self.current_point.point.y,self.current_point.point.z],[1.,3.,.5]):
+            self.assertAlmostEqual(actual,expected,places=8)
         result=self.enable(True);self.assertTrue(result.success,result.message)
         self.wait(lambda:len(self.outputs)>3)
         # 没有monitor也能就绪；显示WARN及随后停发不影响有效控制输入。
@@ -130,7 +157,7 @@ class Wiring(unittest.TestCase):
         self.assertTrue(self.enable(False).success)
         self.wait(lambda:self.stops>stops and self.mode=="READY")
         count=len(self.outputs);time.sleep(.2)
-        self.assertEqual(count,len(self.outputs),"Normal close automatically resumed motion")
+        self.assertEqual(count,len(self.outputs),"正常关闭后自动恢复了运动")
         # 真硬件故障仍锁存；停止失败不能通过reset清除，也不能自动重试。
         self.assertTrue(self.enable(True).success)
         self.wait(lambda:len(self.outputs)>count)
@@ -141,7 +168,7 @@ class Wiring(unittest.TestCase):
         self.assertFalse(self.reset().success)
         self.assertFalse(self.enable(True).success)
         stops=self.stops;count=len(self.outputs);time.sleep(.2)
-        self.assertEqual(self.stops,stops,"Stop was retried automatically")
+        self.assertEqual(self.stops,stops,"停止操作发生未经授权的自动重试")
         self.assertEqual(len(self.outputs),count)
         # 人工关闭服务仅重试停止；成功后依旧锁存，须reset再显式enable。
         self.stop_success=True
@@ -152,6 +179,12 @@ class Wiring(unittest.TestCase):
         self.assertTrue(self.reset().success)
         self.wait(lambda:self.mode=="READY")
         self.assertEqual(len(self.outputs),count)
+        competing=TransformStamped();competing.header.stamp=rospy.Time.now()
+        competing.header.frame_id="absolute_world";competing.child_frame_id="world"
+        competing.transform.rotation.w=1
+        self.pubs["tf"].publish(TFMessage(transforms=[competing]))
+        self.wait(lambda:not self.frame_valid)
+        time.sleep(.1);self.assertFalse(self.frame_valid)
     # 结束后台发布并注销接口，避免测试进程退出前残留消息影响后续用例。
     def tearDown(self):
         self.running=False;self.thread.join(2)

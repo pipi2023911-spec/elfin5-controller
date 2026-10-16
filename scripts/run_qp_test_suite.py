@@ -43,6 +43,13 @@ except NameError:
     TEXT_TYPE = str
 
 
+def as_text(value):
+    # 兼容 Python 2 的 ROS 字节字符串及 Python 3 的文本字符串。
+    if isinstance(value, bytes):
+        return value.decode("utf-8", "replace")
+    return TEXT_TYPE(value)
+
+
 def finite(value):
     return value is not None and not math.isnan(value) and not math.isinf(value)
 
@@ -228,9 +235,9 @@ class Monitor(object):
             if status.name != "elfin5_qp_controller":
                 continue
             values = dict((item.key, item.value) for item in status.values)
-            state = status.message.split(":", 1)[0]
-            detail = status.message.split(":", 1)[1].strip() \
-                if ":" in status.message else status.message
+            state = as_text(status.message).split(":", 1)[0]
+            detail = as_text(status.message).split(":", 1)[1].strip() \
+                if ":" in as_text(status.message) else as_text(status.message)
             with self.lock:
                 self.latest_state = state
                 self.latest_detail = detail
@@ -284,7 +291,7 @@ class TestRunner(object):
     def initialize(self):
         topics = self.config["topics"]
         timeout = self.config["timing"]["startup_timeout"]
-        rospy.loginfo("Waiting for controller services and feedback topics")
+        rospy.loginfo(u"正在等待控制器服务及反馈话题")
         rospy.wait_for_service(topics["enable_service"], timeout=timeout)
         rospy.wait_for_service(topics["controller_list_service"], timeout=timeout)
         self.enable_service = rospy.ServiceProxy(topics["enable_service"], SetBool)
@@ -334,19 +341,19 @@ class TestRunner(object):
 
     def run_round(self, round_name, round_cfg):
         result = {"round": round_name, "title": round_cfg["title"],
-                  "status": "FAIL", "reason": "not run",
+                  "status": "FAIL", "reason": u"尚未运行",
                   "started_at": datetime.datetime.now().isoformat()}
         self.monitor.begin_round(round_name)
         try:
             if round_cfg.get("requires_deep_singularity_permission", False) and \
                     not self.args.allow_deep_singularity:
                 result["status"] = "SKIPPED"
-                result["reason"] = "requires --allow-deep-singularity"
+                result["reason"] = u"需要显式指定 --allow-deep-singularity"
                 return result
             self._prepare_initial_pose(round_name, round_cfg, result)
             if self.args.dry_run:
                 result["status"] = "DRY_RUN"
-                result["reason"] = "environment and initial-state checks passed"
+                result["reason"] = u"环境和初始状态检查通过"
                 return result
             kind = round_cfg["kind"]
             if kind == "retarget":
@@ -359,7 +366,7 @@ class TestRunner(object):
             return result
         except Exception as error:
             result["status"] = "FAIL"
-            result["reason"] = str(error)
+            result["reason"] = as_text(error)
             return result
         finally:
             result["finished_at"] = datetime.datetime.now().isoformat()
@@ -377,21 +384,21 @@ class TestRunner(object):
         time.sleep(0.5)
         response = self.enable_service(False)
         if not response.success:
-            raise RuntimeError("disable service failed: " + response.message)
+            raise RuntimeError(u"关闭服务失败：" + as_text(response.message))
         self._wait_state("IDLE", self.config["timing"]["state_timeout"])
         time.sleep(0.5)
         self._assert_command_quiet()
         if self.args.dry_run:
             result["initial_joints_requested"] = round_cfg["initial_joints"]
             return
-        rospy.loginfo("%s moving to initial joints %s",
+        rospy.loginfo(u"%s：正在移动到初始关节位置 %s",
                       round_name, round_cfg["initial_joints"])
         self.group.set_start_state_to_current_state()
         success = self.group.go(round_cfg["initial_joints"], wait=True)
         self.group.stop()
         self.group.clear_pose_targets()
         if not success:
-            raise RuntimeError("MoveIt failed to execute initial joint pose")
+            raise RuntimeError(u"MoveIt 未能执行初始关节姿态")
         time.sleep(self.config["timing"]["moveit_settle_time"])
         self._check_joint_goal(round_cfg["initial_joints"])
         sigma = self._wait_numeric("sigma")
@@ -401,7 +408,7 @@ class TestRunner(object):
         result["initial_joints_actual"] = self._current_joint_vector()
         if sigma < sigma_range[0] or sigma > sigma_range[1]:
             raise RuntimeError(
-                "initial sigma %.6g outside expected range [%.6g, %.6g]" %
+                u"初始最小奇异值 %.6g 超出预期范围 [%.6g, %.6g]" %
                 (sigma, sigma_range[0], sigma_range[1]))
 
     def _run_targets(self, round_cfg, result):
@@ -426,15 +433,15 @@ class TestRunner(object):
             if state != "REACHED":
                 if state in round_cfg.get("allowed_safe_terminal_states", []):
                     result["status"] = "PASS_SAFE_HOLD"
-                    result["reason"] = "safe terminal state " + state
+                    result["reason"] = u"进入允许的安全终止状态：" + state
                     result["terminal_state"] = state
                     result["targets"] = targets
                     return
-                raise RuntimeError("target ended in state " + str(state))
+                raise RuntimeError(u"目标执行结束时的状态：" + str(state))
         result["targets"] = targets
         result["terminal_state"] = "REACHED"
         result["status"] = "PASS"
-        result["reason"] = "all targets reached"
+        result["reason"] = u"全部目标已到达"
 
     def _run_retarget(self, round_cfg, result):
         anchor = list(self._wait_point())
@@ -446,23 +453,23 @@ class TestRunner(object):
         time.sleep(self.config["timing"]["target_settle_time"])
         response = self.enable_service(True)
         if not response.success:
-            raise RuntimeError("enable rejected: " + response.message)
+            raise RuntimeError(u"启用请求被拒绝：" + as_text(response.message))
         end = time.time() + round_cfg["switch_after"]
         while time.time() < end:
             state = self.monitor.snapshot()["state"]
             if state in FATAL_STATES:
-                raise RuntimeError("fatal state before retarget: " + state)
+                raise RuntimeError(u"切换目标前出现故障状态：" + state)
             time.sleep(0.05)
         self.inputs.set_target(second)
         self.monitor.add_target(second)
         state = self._wait_for_target_outcome(
             self.config["timing"]["reach_timeout"], [])
         if state != "REACHED":
-            raise RuntimeError("retarget ended in state " + str(state))
+            raise RuntimeError(u"在线切换目标后的终止状态：" + str(state))
         result["targets"] = [first, second]
         result["terminal_state"] = state
         result["status"] = "PASS"
-        result["reason"] = "online retarget reached"
+        result["reason"] = u"在线切换后的目标已到达"
 
     def _run_stale_input(self, round_cfg, result):
         anchor = list(self._wait_point())
@@ -473,7 +480,7 @@ class TestRunner(object):
         time.sleep(self.config["timing"]["target_settle_time"])
         response = self.enable_service(True)
         if not response.success:
-            raise RuntimeError("enable rejected: " + response.message)
+            raise RuntimeError(u"启用请求被拒绝：" + as_text(response.message))
         self._wait_any_state(["RUNNING", "SINGULARITY_RECOVERY"], 5.0)
         self.inputs.stop_target()
         self._wait_state("STALE_INPUT",
@@ -486,7 +493,7 @@ class TestRunner(object):
         self._wait_state("IDLE", 5.0)
         response = self.enable_service(True)
         if not response.success:
-            raise RuntimeError("second enable rejected: " + response.message)
+            raise RuntimeError(u"第二次启用请求被拒绝：" + as_text(response.message))
         self._wait_any_state(["RUNNING", "SINGULARITY_RECOVERY"], 5.0)
         self.inputs.set_base_enabled(False)
         self._wait_state("STALE_INPUT",
@@ -494,7 +501,7 @@ class TestRunner(object):
         result["base_timeout_passed"] = True
         result["terminal_state"] = "STALE_INPUT"
         result["status"] = "PASS"
-        result["reason"] = "target and base timeout protections passed"
+        result["reason"] = u"目标及基座输入超时保护检查通过"
 
     def _start_enabled_target(self, anchor, offset):
         target = [anchor[i] + offset[i] for i in range(3)]
@@ -503,7 +510,7 @@ class TestRunner(object):
         time.sleep(self.config["timing"]["target_settle_time"])
         response = self.enable_service(True)
         if not response.success:
-            raise RuntimeError("enable rejected: " + response.message)
+            raise RuntimeError(u"启用请求被拒绝：" + as_text(response.message))
 
     def _wait_for_target_outcome(self, timeout, allowed_safe_states):
         deadline = time.time() + timeout
@@ -536,7 +543,7 @@ class TestRunner(object):
             result["final_sigma"] = sigma_values[-1]
             if not all(finite(value) for value in sigma_values):
                 result["status"] = "FAIL"
-                result["reason"] = "non-finite singular value"
+                result["reason"] = u"奇异值不是有限数值"
         max_velocity, max_acceleration = self._command_metrics(commands)
         result["maximum_command_velocity"] = max_velocity
         result["maximum_command_acceleration"] = max_acceleration
@@ -545,10 +552,10 @@ class TestRunner(object):
             tolerance = limits["command_limit_tolerance"]
             if max_velocity > limits["maximum_joint_velocity"] + tolerance:
                 result["status"] = "FAIL"
-                result["reason"] = "command velocity limit exceeded"
+                result["reason"] = u"命令速度超过限值"
             if max_acceleration > limits["maximum_joint_acceleration"] * 1.25:
                 result["status"] = "FAIL"
-                result["reason"] = "command acceleration limit exceeded"
+                result["reason"] = u"命令加速度超过限值"
         if round_cfg["kind"] in ["singular_recovery", "singular_protection",
                                  "deep_singularity"] and sigma_values:
             improvement = max(sigma_values) - sigma_values[0]
@@ -558,7 +565,7 @@ class TestRunner(object):
                 round_cfg.get("allowed_safe_terminal_states", [])
             if improvement < required and not safe_terminal:
                 result["status"] = "FAIL"
-                result["reason"] = "singularity did not improve by %.6g" % required
+                result["reason"] = u"最小奇异值的改善幅度未达到 %.6g" % required
 
     def _command_metrics(self, commands):
         maximum_velocity = 0.0
@@ -593,7 +600,7 @@ class TestRunner(object):
             if state in expected:
                 return state
             time.sleep(0.05)
-        raise RuntimeError("timed out waiting for controller state %s; latest=%s" %
+        raise RuntimeError(u"等待控制器状态 %s 超时；当前状态为 %s" %
                            (expected, self.monitor.snapshot()["state"]))
 
     def _wait_numeric(self, key):
@@ -603,7 +610,7 @@ class TestRunner(object):
             if finite(value):
                 return value
             time.sleep(0.05)
-        raise RuntimeError("timed out waiting for finite " + key)
+        raise RuntimeError(u"等待有限数值超时：" + key)
 
     def _wait_point(self):
         deadline = time.time() + self.config["timing"]["state_timeout"]
@@ -612,17 +619,17 @@ class TestRunner(object):
             if point is not None and all(finite(value) for value in point):
                 return point
             time.sleep(0.05)
-        raise RuntimeError("timed out waiting for current_point")
+        raise RuntimeError(u"等待当前末端位置超时")
 
     def _current_joint_vector(self):
         joint = self.monitor.snapshot()["joint"]
         if joint is None:
-            raise RuntimeError("joint state is unavailable")
+            raise RuntimeError(u"关节反馈不可用")
         positions = joint[0]
         missing = [name for name in self.config["joint_names"]
                    if name not in positions]
         if missing:
-            raise RuntimeError("joint state missing " + ",".join(missing))
+            raise RuntimeError(u"关节反馈缺少：" + ",".join(missing))
         return [positions[name] for name in self.config["joint_names"]]
 
     def _check_joint_goal(self, requested):
@@ -630,7 +637,7 @@ class TestRunner(object):
         tolerance = self.config["limits"]["joint_goal_tolerance"]
         maximum_error = max(abs(a - b) for a, b in zip(actual, requested))
         if maximum_error > tolerance:
-            raise RuntimeError("MoveIt joint goal error %.6g exceeds %.6g" %
+            raise RuntimeError(u"MoveIt 关节目标误差 %.6g 超过容差 %.6g" %
                                (maximum_error, tolerance))
 
     def _assert_command_quiet(self):
@@ -640,17 +647,17 @@ class TestRunner(object):
         after = self.monitor.snapshot()["command_count"]
         if after - before > 1:
             raise RuntimeError(
-                "QP-disabled command topic is active at %.2f Hz; "
-                "base_pose/state gate is not ready" %
+                u"QP 关闭时命令话题仍以 %.2f Hz 发布；"
+                u"基座位姿或状态检查尚未就绪" %
                 ((after - before) / quiet_time))
 
     def _check_controllers(self):
         response = self.list_controllers()
         states = dict((item.name, item.state) for item in response.controller)
         if states.get("joint_state_controller") != "running":
-            raise RuntimeError("joint_state_controller is not running")
+            raise RuntimeError(u"joint_state_controller 未处于运行状态")
         if states.get("elfin_arm_controller") != "running":
-            raise RuntimeError("elfin_arm_controller is not running")
+            raise RuntimeError(u"elfin_arm_controller 未处于运行状态")
 
     def _write_parameters(self):
         path = os.path.join(self.output_dir, "parameters.yaml")
@@ -740,7 +747,7 @@ def write_outputs(output_dir, runner):
                            initial_sigma=item.get("initial_sigma", ""),
                            minimum_sigma=item.get("minimum_sigma", ""),
                            final_error=item.get("final_error", ""),
-                           reason=TEXT_TYPE(item.get("reason", u""))
+                           reason=as_text(item.get("reason", u""))
                            .replace(u"|", u"/")))
     summary.extend([u"", u"## 逐轮详情", u""])
     for item in runner.results:
@@ -781,7 +788,7 @@ def resolve_output(args):
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default=None,
-                        help="test YAML; defaults to package config")
+                        help=u"测试 YAML 路径，默认使用包内配置")
     parser.add_argument("--rounds", default="R1,R2,R3,R4,R5,R6,R7,R8,R9")
     parser.add_argument("--output", default=None)
     parser.add_argument("--non-interactive", action="store_true")
@@ -801,18 +808,18 @@ def main():
     requested = [item.strip() for item in args.rounds.split(",") if item.strip()]
     unknown = [item for item in requested if item not in config["rounds"]]
     if unknown:
-        raise RuntimeError("unknown rounds: " + ",".join(unknown))
+        raise RuntimeError(u"未知测试轮次：" + ",".join(unknown))
     output_dir = resolve_output(args)
     rospy.init_node("elfin5_qp_test_suite", anonymous=False)
     runner = TestRunner(config, args, output_dir)
-    print("Results directory: " + output_dir)
+    print(u"结果目录：" + output_dir)
     try:
         runner.initialize()
         runner.start_bag()
         for round_name in requested:
             round_cfg = config["rounds"][round_name]
             if not args.non_interactive and not args.dry_run:
-                prompt = ("Type RUN %s to execute '%s', or anything else to skip: " %
+                prompt = (u"输入 RUN %s 执行“%s”，输入其他内容则跳过：" %
                           (round_name, round_cfg["title"]))
                 # Python 2 raw_input() tries to coerce a unicode prompt through
                 # ASCII.  Round titles come from YAML as unicode, so encode the
@@ -825,21 +832,21 @@ def main():
                     runner.results.append({"round": round_name,
                                            "title": round_cfg["title"],
                                            "status": "SKIPPED",
-                                           "reason": "operator skipped"})
+                                           "reason": u"操作人员已跳过"})
                     write_outputs(output_dir, runner)
                     continue
             result = runner.run_round(round_name, round_cfg)
             runner.results.append(result)
             write_outputs(output_dir, runner)
-            print("%s: %s — %s" %
+            print(u"%s：%s — %s" %
                   (round_name, result["status"], result["reason"]))
             if result["status"] == "FAIL" and not args.continue_on_failure:
-                print("Stopping after failure; use --continue-on-failure to override")
+                print(u"测试失败后已停止；如需继续须显式指定 --continue-on-failure")
                 break
     finally:
         runner.shutdown()
         write_outputs(output_dir, runner)
-        print("Final report: " + os.path.join(output_dir, "summary.md"))
+        print(u"最终报告：" + os.path.join(output_dir, "summary.md"))
     return 0
 
 

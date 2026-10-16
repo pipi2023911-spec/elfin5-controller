@@ -4,10 +4,30 @@
      请用rostest的独立master运行，不把该文件混入真机launch。 -->
 
 <launch>
-  <!-- rostest creates an isolated ROS master; no vendor driver or physical topic. -->
+  <!-- rostest 使用独立 ROS master，不启动厂家驱动或连接物理设备。 -->
   <group ns="elfin5_real">
-    <!-- 最小六关节模型，只为检查站点限值在URDF范围内，不代表Elfin5几何。 -->
-    <param name="robot_description" value="&lt;robot name=&quot;gate_test&quot;>&lt;link name=&quot;elfin_base_link&quot;/>&lt;link name=&quot;l1&quot;/>&lt;joint name=&quot;elfin_joint1&quot; type=&quot;revolute&quot;>&lt;parent link=&quot;elfin_base_link&quot;/>&lt;child link=&quot;l1&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;link name=&quot;l2&quot;/>&lt;joint name=&quot;elfin_joint2&quot; type=&quot;revolute&quot;>&lt;parent link=&quot;l1&quot;/>&lt;child link=&quot;l2&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;link name=&quot;l3&quot;/>&lt;joint name=&quot;elfin_joint3&quot; type=&quot;revolute&quot;>&lt;parent link=&quot;l2&quot;/>&lt;child link=&quot;l3&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;link name=&quot;l4&quot;/>&lt;joint name=&quot;elfin_joint4&quot; type=&quot;revolute&quot;>&lt;parent link=&quot;l3&quot;/>&lt;child link=&quot;l4&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;link name=&quot;l5&quot;/>&lt;joint name=&quot;elfin_joint5&quot; type=&quot;revolute&quot;>&lt;parent link=&quot;l4&quot;/>&lt;child link=&quot;l5&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;link name=&quot;l6&quot;/>&lt;joint name=&quot;elfin_joint6&quot; type=&quot;revolute&quot;>&lt;parent link=&quot;l5&quot;/>&lt;child link=&quot;l6&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;/robot>"/>
+    <!-- 最小六关节模型，用于检查站点限值、模型根及显示变换，不代表Elfin5几何。 -->
+    <param name="/robot_description" value="&lt;robot name=&quot;gate_test&quot;>&lt;link name=&quot;world&quot;/>&lt;joint name=&quot;world_base&quot; type=&quot;fixed&quot;>&lt;parent link=&quot;world&quot;/>&lt;child link=&quot;elfin_base_link&quot;/>&lt;/joint>&lt;link name=&quot;elfin_base_link&quot;/>&lt;link name=&quot;l1&quot;/>&lt;joint name=&quot;elfin_joint1&quot; type=&quot;revolute&quot;>&lt;origin xyz=&quot;1 0 0&quot;/>&lt;parent link=&quot;elfin_base_link&quot;/>&lt;child link=&quot;l1&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;link name=&quot;l2&quot;/>&lt;joint name=&quot;elfin_joint2&quot; type=&quot;revolute&quot;>&lt;parent link=&quot;l1&quot;/>&lt;child link=&quot;l2&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;link name=&quot;l3&quot;/>&lt;joint name=&quot;elfin_joint3&quot; type=&quot;revolute&quot;>&lt;parent link=&quot;l2&quot;/>&lt;child link=&quot;l3&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;link name=&quot;l4&quot;/>&lt;joint name=&quot;elfin_joint4&quot; type=&quot;revolute&quot;>&lt;parent link=&quot;l3&quot;/>&lt;child link=&quot;l4&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;link name=&quot;l5&quot;/>&lt;joint name=&quot;elfin_joint5&quot; type=&quot;revolute&quot;>&lt;parent link=&quot;l4&quot;/>&lt;child link=&quot;l5&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;link name=&quot;l6&quot;/>&lt;joint name=&quot;elfin_joint6&quot; type=&quot;revolute&quot;>&lt;parent link=&quot;l5&quot;/>&lt;child link=&quot;l6&quot;/>&lt;axis xyz=&quot;0 0 1&quot;/>&lt;limit lower=&quot;-2&quot; upper=&quot;2&quot; velocity=&quot;1&quot; effort=&quot;1&quot;/>&lt;/joint>&lt;/robot>"/>
+    <param name="/robot_description_semantic" value="&lt;robot name=&quot;gate_test&quot;>&lt;group name=&quot;elfin_arm&quot;>&lt;chain base_link=&quot;elfin_base_link&quot; tip_link=&quot;l6&quot;/>&lt;/group>&lt;/robot>"/>
+    <!-- 使用真实发布器验证厂家内部 TF 不会触发监视器的根坐标竞争检测。 -->
+    <node pkg="robot_state_publisher" type="robot_state_publisher" name="vendor_model_fixture">
+      <remap from="joint_states" to="/elfin5_test/joints"/>
+      <remap from="robot_description" to="/robot_description"/>
+    </node>
+    <!-- 与假诊断话题隔离，原状态机用例仍检查显示失效不会改变运动准入。 -->
+    <node pkg="elfin5_qp_controller" type="real_robot_monitor_node" name="frame_monitor" output="screen">
+      <rosparam>
+joint_names: [elfin_joint1, elfin_joint2, elfin_joint3, elfin_joint4, elfin_joint5, elfin_joint6]
+world_frame: absolute_world
+model_root_frame: world
+base_link: elfin_base_link
+tip_link: l6
+joint_states_topic: /elfin5_test/joints
+base_pose_topic: /elfin5_test/base
+target_point_topic: /elfin5_test/target
+controller_state_topic: /elfin5_test/controller
+      </rosparam>
+    </node>
     <node pkg="elfin5_qp_controller" type="real_robot_bridge_node" name="bridge" required="true" output="screen">
       <!-- 测试专用条件：让夹具能进入READY/ACTIVE以验证状态转换；不能照搬到现场。 -->
       <rosparam>
@@ -31,7 +51,7 @@ candidate_node: /elfin5_real/test_real_robot_wiring
 candidate_max_age: 0.05
       </rosparam>
     </node>
-    <!-- 可执行夹具会发送假反馈、假OK和假stop回执，只验证网关行为。 -->
+    <!-- 可执行夹具会发送假反馈、假OK和假stop回执，验证网关与监视器行为。 -->
     <test test-name="real_robot_wiring" name="test_real_robot_wiring"
           pkg="elfin5_qp_controller" type="test_real_robot_wiring.py" time-limit="40"/>
   </group>

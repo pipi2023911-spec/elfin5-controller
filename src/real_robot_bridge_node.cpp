@@ -1,7 +1,7 @@
 /*
  * real_robot_bridge_node.cpp
  * Elfin5 真机命令网关：候选轨迹与实际 EtherCAT 执行链之间的唯一规划出口。
- * 输入：真实 joint_states、world 中的 base_pose/target_point、JTC state、硬件诊断和QP诊断；显示/误差监视不参与运动准入。
+ * 输入：真实 joint_states、absolute_world 中的 base_pose/target_point、JTC state、硬件诊断和QP诊断；显示/误差监视不参与运动准入。
  * 输出：校验后的 QP 专用输入、网关状态，以及仅 ACTIVE 状态允许发送的原始候选轨迹。
  * 状态机：OBSERVE（条件不足）→ READY（条件齐全）→ 显式 enable → ACTIVE。
  * ACTIVE 遇异常进入 FAULT_LATCHED；reset 只回到观察，数据恢复不能自动恢复运动。
@@ -66,7 +66,7 @@ class RealBridge {
   // actual_ 来自真实 JointState；reference_* 来自下层控制器当前插值参考，均按六轴名称重排。
   std::vector<double> actual_,reference_,reference_velocity_;
   std::string world_,controller_name_,controller_type_,hardware_name_,hardware_id_;
-  std::string command_topic_,candidate_topic_,candidate_node_,reason_="startup_observe";
+  std::string command_topic_,candidate_topic_,candidate_node_,reason_="启动观察，尚未放行运动";
   std::string mode_="OBSERVE";  // 启动/重启不会直接执行轨迹。
   double timeout_,max_skew_,max_candidate_age_,candidate_timeout_,last_stamp_=0;
   ros::Time epoch_,last_ros_;  // 分别记录本次激活边界和用于检测时间回退的上一时刻。
@@ -95,7 +95,7 @@ class RealBridge {
       mode_="FAULT_LATCHED";
       // 只提交请求，由 stopLoop 发起可能阻塞的服务调用，避免在命令回调里等待网络。
       stop_requested_=true;
-      ROS_ERROR_STREAM("Gate closed: "<<reason<<"; requesting site stop");
+      ROS_ERROR_STREAM("网关已关闭："<<reason<<"；正在请求站点停止");
     }
   }
   // 底层检查保留稳定的英文原因码；仅在桥接节点输出 why 前转换为中文。
@@ -123,7 +123,7 @@ class RealBridge {
   }
   // 放行条件的统一入口：它只判断条件并给出 why，不主动变成 ACTIVE，也不使能机械臂。
   bool ready(std::string& why) {
-    // Do not make parameter-server RPCs in the gate/watchdog callback.
+    // 网关和看门狗回调不执行参数服务器远程调用，避免阻塞控制检查。
     if(ros::Time::isSimTime()) {why="真机控制禁止使用仿真时间";return false;}
     // 现场审查标志和模型内的真实限值缺一不可；默认配置有意停留在观察状态。
     if(!reviewed_ || !model_valid_) {why="现场审查未完成，或模型及关节限值缺失或无效";return false;}
@@ -151,7 +151,7 @@ class RealBridge {
     std::vector<double> q;
     if(!acceptStamp(m->header.stamp,joints_) ||
        !eq::orderedPositions(limits_.names,m->name,m->position,q)) {
-      joints_.valid=false;fault("invalid_joint_feedback");return;
+      joints_.valid=false;fault("关节反馈无效");return;
     }
     actual_=q;joints_.set(m->header.stamp);joint_out_.publish(m);
   }
@@ -163,7 +163,7 @@ class RealBridge {
     const double norm=q.x*q.x+q.y*q.y+q.z*q.z+q.w*q.w;
     if(!acceptStamp(m->header.stamp,base_) || m->header.frame_id!=world_ ||
        !finitePoint(m->pose.position) || !std::isfinite(norm) || std::abs(norm-1)>0.01) {
-      base_.valid=false;fault("invalid_base_pose");return;
+      base_.valid=false;fault("基座位姿无效");return;
     }
     base_.set(m->header.stamp);base_out_.publish(m);
   }
@@ -172,7 +172,7 @@ class RealBridge {
     std::lock_guard<std::mutex> lock(mutex_);
     if(!acceptStamp(m->header.stamp,target_) || m->header.frame_id!=world_ ||
        !finitePoint(m->point)) {
-      target_.valid=false;fault("invalid_target");return;
+      target_.valid=false;fault("目标点无效");return;
     }
     target_.set(m->header.stamp);target_out_.publish(m);
   }
@@ -186,7 +186,7 @@ class RealBridge {
        !eq::orderedPositions(limits_.names,m->joint_names,m->actual.positions,q) ||
        !eq::orderedPositions(limits_.names,m->joint_names,m->desired.positions,reference_) ||
        !eq::orderedPositions(limits_.names,m->joint_names,m->desired.velocities,reference_velocity_)) {
-      controller_.valid=false;fault("invalid_controller_state");return;
+      controller_.valid=false;fault("JTC 控制器反馈无效");return;
     }
     controller_.set(m->header.stamp);
   }
@@ -201,7 +201,7 @@ class RealBridge {
                         s.level==diagnostic_msgs::DiagnosticStatus::OK;
     }
     if(ok && count==1 && !hardware_id_.empty()) hardware_.set(m->header.stamp);
-    else {hardware_.valid=false;fault("hardware_interlock_not_ok");}
+    else {hardware_.valid=false;fault("硬件互锁未满足");}
   }
   // 只允许正常运行、到点保持和奇异区恢复；QP_DEGRADED 不列入白名单。
   // 诊断和候选轨迹并非同一原子消息，因此该检查不能证明逐周期配对。
@@ -215,7 +215,7 @@ class RealBridge {
       ok=ok && (state=="RUNNING" || state=="REACHED" || state=="SINGULARITY_RECOVERY");
     }
     if(ok && count==1) qp_.set(m->header.stamp);
-    else {qp_.valid=false;fault("qp_not_running_or_degraded");}
+    else {qp_.valid=false;fault("QP 状态不满足放行条件或求解已降级");}
   }
   // 候选命令回调是实际轨迹发布的唯一代码路径。
   // 先查状态和全部门禁，再调用纯检查函数；失败即关闭本轮以及后续放行。
@@ -227,7 +227,7 @@ class RealBridge {
     if(!ready(why)) {fault(why);return;}
     // 限定为 V2 的单点位置+速度协议；不接收额外加速度/力矩字段，以免扩大解释范围。
     if(m->points.size()!=1 || !m->points.front().accelerations.empty() ||
-       !m->points.front().effort.empty()) {fault("unexpected_trajectory_shape");return;}
+       !m->points.front().effort.empty()) {fault("候选轨迹的点数、维度或字段不符合约定");return;}
     const auto& point=m->points.front();
     // 将 ROS 消息提取成不依赖 ROS 的检查输入，便于核心逻辑单独测试。
     eq::HardwareCommand c;
@@ -236,7 +236,7 @@ class RealBridge {
     if(!eq::checkCommand(limits_,c,actual_,reference_,reference_velocity_,
                         ros::Time::now().toSec(),epoch_.toSec(),last_stamp_,
                         max_candidate_age_,why)) {why=commandReasonChinese(why);fault(why);return;}
-    // No integration, clipping, retimestamping, or trajectory substitution.
+    // 原样转发通过检查的轨迹，不积分、不裁剪、不改时间戳、不替换轨迹。
     // 原样发布：不重新积分、不裁剪端点、不重置时间。接受后才推进防重放时间。
     command_out_.publish(m);last_stamp_=c.stamp;
     last_candidate_wall_=ros::WallTime::now();
@@ -254,26 +254,26 @@ class RealBridge {
       }
       res.success=true;res.message="网关已关闭；若此前活动或停止失败，已请求停止，完成情况请查看状态";return true;
     }
-    if(mode_=="FAULT_LATCHED") {res.message="reset_required_after_site_stop";return true;}
-    if(mode_=="ACTIVE") {res.success=true;res.message="already_active";return true;}
+    if(mode_=="FAULT_LATCHED") {res.message="请先确认现场已停止，再人工复位网关";return true;}
+    if(mode_=="ACTIVE") {res.success=true;res.message="网关已处于 ACTIVE 状态";return true;}
     std::string why;
     if(!ready(why)) {res.message=why;return true;}
     // 激活时创建新的时间代次；队列中早于该时刻的旧候选不能被补发到真机。
     mode_="ACTIVE";epoch_=ros::Time::now();last_stamp_=epoch_.toSec();
     last_candidate_wall_=ros::WallTime::now();
-    reason_="explicit_activation";res.success=true;res.message="ACTIVE";return true;
+    reason_="人工请求已通过，网关已放行";res.success=true;res.message="ACTIVE：人工放行成功";return true;
   }
   // 人工复位只清网关锁存，不证明机械臂已经静止，也不重新打开硬件输出。
   bool reset(std_srvs::Trigger::Request&,std_srvs::Trigger::Response& res) {
     std::lock_guard<std::mutex> lock(mutex_);
     if(mode_=="ACTIVE" || stop_in_progress_ || stop_requested_) {
-      res.message="close_gate_and_wait_for_stop_request_first";return true;
+      res.message="请先关闭网关并等待停止请求完成";return true;
     }
     if(stop_failed_) {
       res.message="停止服务上次调用失败；请先处理现场停止问题，再显式调用 enable(false) 重试";return true;
     }
-    mode_="OBSERVE";reason_="manual_reset";last_stamp_=0;
-    res.success=true;res.message="OBSERVE; reset_does_not_enable_hardware";return true;
+    mode_="OBSERVE";reason_="已人工复位，仍需重新检查并显式放行";last_stamp_=0;
+    res.success=true;res.message="OBSERVE：复位完成，不使能硬件、不恢复运动";return true;
   }
   // 墙钟周期监督：即使没有新候选回调，也会检查输入时效和候选发布中断。
   void tick(const ros::WallTimerEvent&) {
@@ -282,7 +282,7 @@ class RealBridge {
     // ROS 时间回退会破坏先后关系；清空所有有效标志，并在运动中触发锁存。
     if(!last_ros_.isZero() && now<last_ros_) {
       joints_.valid=base_.valid=target_.valid=controller_.valid=hardware_.valid=qp_.valid=false;
-      fault("ros_clock_backwards");
+      fault("ROS 时间发生回退");
     }
     last_ros_=now;
     std::string why;
@@ -291,10 +291,10 @@ class RealBridge {
       if(!ok) fault(why);
       // 候选自身的看门狗独立于输入新鲜度；输入仍在更新但求解节点停发也必须关闭网关。
       else if((ros::WallTime::now()-last_candidate_wall_).toSec()>candidate_timeout_)
-        fault("candidate_watchdog");
+        fault("候选轨迹接收超时");
     // 只有非故障的观察/就绪状态可以自动互转；此分支绝不会自动进入 ACTIVE。
     } else if(mode_!="FAULT_LATCHED") {
-      mode_=ok?"READY":"OBSERVE";reason_=ok?"ready_for_explicit_activation":why;
+      mode_=ok?"READY":"OBSERVE";reason_=ok?"条件满足，等待人工显式放行":why;
     }
     std_msgs::String state;state.data=mode_+": "+reason_;state_out_.publish(state);
   }
@@ -335,7 +335,6 @@ class RealBridge {
       if(graph && payload.getType()==XmlRpc::XmlRpcValue::TypeArray && payload.size()==3) {
         ownership=onlyPublisher(payload[0],command_topic_,ros::this_node::getName()) &&
                   onlyPublisher(payload[0],candidate_topic_,candidate_node_);
-        // Action goals bypass the command topic. Any registered goal publisher blocks ACTIVE.
         // action goal 可以绕过 command 话题；存在此类发布者时同样阻止放行。
         // 轮询有时间窗口，仍须现场管理命令源，不能把它当作安全权限机制。
         const auto action=command_topic_.substr(0,command_topic_.find_last_of('/'))+
@@ -370,9 +369,9 @@ class RealBridge {
         {std::lock_guard<std::mutex> lock(mutex_);
          stop_failed_=!ok;
          if(!ok) mode_="FAULT_LATCHED";
-         reason_+=ok?"; stop_service_ack":"; STOP_SERVICE_FAILED";
+         reason_+=ok?"；停止服务已应答，仍须确认实际静止":"；停止服务调用失败";
          stop_in_progress_=false;}
-        if(!ok) ROS_ERROR("Site stop failed; independent hardware stop/watchdog required");
+        if(!ok) ROS_ERROR("站点停止失败；请使用现场独立硬件停止措施，并检查硬件看门狗");
       }
       ros::WallDuration(0.01).sleep();
     }
@@ -385,8 +384,8 @@ public:
     p_.param("candidate_max_age",max_candidate_age_,0.02);
     p_.param("candidate_timeout",candidate_timeout_,0.15);
     p_.param("site_review_complete",reviewed_,false);
-    // Deliberately no simulation-time override: this executable is a hardware gate.
-    p_.param<std::string>("world_frame",world_,"world");
+    // 本节点是真机网关，不提供绕过真实时钟检查的配置。
+    p_.param<std::string>("world_frame",world_,"absolute_world");
     p_.param<std::string>("controller_name",controller_name_,"elfin_arm_controller");
     p_.param<std::string>("controller_type",controller_type_,"position_controllers/JointTrajectoryController");
     p_.param<std::string>("hardware_status_name",hardware_name_,"elfin5_hardware");
@@ -397,15 +396,15 @@ public:
     p_.param("min_horizon",limits_.min_horizon,0.02);p_.param("max_horizon",limits_.max_horizon,0.15);
     // 时效配置是放行契约的一部分；NaN 或非正阈值在启动阶段直接报错。
     for(double value:{timeout_,max_skew_,max_candidate_age_,candidate_timeout_})
-      if(!std::isfinite(value)||value<=0) throw std::runtime_error("Invalid timing parameter");
+      if(!std::isfinite(value)||value<=0) throw std::runtime_error("时间参数无效");
     if(limits_.names.size()!=6 || std::set<std::string>(limits_.names.begin(),limits_.names.end()).size()!=6)
-      throw std::runtime_error("Exactly six unique joint_names required");
+      throw std::runtime_error("必须配置六个互不重复的 joint_names");
     std::string why;
     model_valid_=limits_.valid(why);
     // 把站点限值与当前命名空间的 URDF 比较；位置和速度不得超出模型限制。
     urdf::Model model;
     std::string xml;
-    n_.getParam("robot_description",xml);
+    n_.getParam("/robot_description",xml);
     model_valid_=model.initString(xml) && model_valid_;
     // 当前实现只接受具有明确限位的转动关节，不自动按连续关节规则折叠角度。
     if(model_valid_) for(std::size_t i=0;i<6;++i) {
@@ -415,12 +414,12 @@ public:
       model_valid_=limits_.lower[i]>=j->limits->lower && limits_.upper[i]<=j->limits->upper &&
                    limits_.velocity[i]<=j->limits->velocity;
     }
-    if(!model_valid_) ROS_WARN("Site limits absent/invalid: OBSERVE only");
+    if(!model_valid_) ROS_WARN("现场限值或模型缺失、无效：仅允许观察");
     // 先解析完整 ROS 名称，再核对候选/实际通道不能相同，避免命名空间掩盖重接线。
     command_topic_=n_.resolveName(topic("command_topic","/elfin_arm_controller/command"));
     candidate_topic_=n_.resolveName(topic("candidate_topic","/elfin5_real/candidate_trajectory"));
     candidate_node_=topic("candidate_node","/elfin5_real/qp_candidate");
-    if(command_topic_==candidate_topic_) throw std::runtime_error("Candidate must be isolated");
+    if(command_topic_==candidate_topic_) throw std::runtime_error("候选话题必须与实际命令话题隔离");
     // 输出队列为1且不锁存，避免新订阅者自动收到上一轮历史命令。
     command_out_=n_.advertise<trajectory_msgs::JointTrajectory>(command_topic_,1,false);
     // validated/* 专供候选 QP 和真实关节模型显示；只有格式及时间有效的输入才转发。

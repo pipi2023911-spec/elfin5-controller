@@ -70,7 +70,7 @@ target_link_libraries(elfin5_qp_controller_node
 )
 
 
-# Real hardware integration reuses the existing V2 solver/controller without edits.
+# 真机接入复用 V2 求解算法，通过配置与重映射适配输入输出。
 # 纯检查库与ROS节点分离，避免为了测试限值逻辑而启动硬件通信。
 add_library(elfin5_real_command_gate src/real_robot_command_gate.cpp)
 add_executable(real_robot_bridge_node src/real_robot_bridge_node.cpp)
