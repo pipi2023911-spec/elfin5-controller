@@ -35,6 +35,8 @@ QP自己检查算法输入。网关不转发validated输入、不订阅QP诊断�
 
 QP的base/target需要持续更新且坐标系正确；不能只改frame_id冒充坐标变换。状态包括IDLE、WAITING_FOR_INPUT、INVALID_INPUT、STALE_INPUT、RUNNING、REACHED、QP_DEGRADED、QP_INFEASIBLE和奇异性相关状态。诊断用于分析，不作为网关逐候选授权凭证。
 
+求解器参数和QPSolution结构不变。iterations为所有盒子问题累计的有效集步骤，受qp_max_iterations总预算限制；不是耗时。qp_projected_gradient_norm兼容键现在对应归一化KKT残差，定义见[QP算法](qp_solver.md)，不得与旧投影残差直接比较。可行但未满足KKT容差仍为QP_DEGRADED。中文原因区分数学不可行、预算不足和数值失败；上层已有QP_INFEASIBLE是通用失败状态，不证明所有失败都属于数学不可行。
+
 ## 网关输入输出
 
 | 默认话题 | 类型 | 用途 |

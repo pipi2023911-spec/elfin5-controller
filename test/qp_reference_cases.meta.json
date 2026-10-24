@@ -1,0 +1,11 @@
+{
+  "count": 2000,
+  "groups": [667, 667, 666],
+  "sha256": "5a3a80a2bdd4028809aedeac3302bb99b9e241e2a4bd4b8f8da0d917a00d7da7",
+  "source": "用户提供的 repo_patches.zip 中固定参考集，原文件逐字节保留",
+  "reported_seed": 42,
+  "original_numpy_version": null,
+  "original_scipy_version": null,
+  "reference": "原作者SLSQP参考目标值；修复验收另外检查原始约束、双向目标差和独立KKT",
+  "scope": "六维可行合成问题；不是实际机械臂故障率；不可行和异常输入由解析用例覆盖"
+}

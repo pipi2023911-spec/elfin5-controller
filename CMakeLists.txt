@@ -114,6 +114,16 @@ install(FILES README.md
 # 测试分工：纯C++规则、ROS隔离状态机、Python模型/误差检查。
 # 没有开启或运行这些测试时，不能仅凭构建成功声称功能验证通过。
 if(CATKIN_ENABLE_TESTING)
+  add_executable(test_box_qp_standalone test/test_box_qp_standalone.cpp)
+  target_link_libraries(test_box_qp_standalone elfin5_box_qp_solver)
+  add_test(NAME box_qp_regression COMMAND test_box_qp_standalone
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/qp_reference_cases.txt 2000)
+  find_program(QP_TEST_PYTHON3 NAMES python3)
+  if(QP_TEST_PYTHON3)
+    add_test(NAME box_qp_file_contract COMMAND ${QP_TEST_PYTHON3}
+      ${CMAKE_CURRENT_SOURCE_DIR}/test/test_qp_input_files.py
+      $<TARGET_FILE:test_box_qp_standalone>)
+  endif()
   add_executable(test_gate_standalone test/test_gate_standalone.cpp)
   target_link_libraries(test_gate_standalone elfin5_real_command_gate)
   add_test(NAME gateway_core COMMAND test_gate_standalone)

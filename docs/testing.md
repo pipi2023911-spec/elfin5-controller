@@ -4,6 +4,17 @@
 
 ## 1. 不依赖ROS的检查
 
+先验证QP，仓库根目录执行（需要Eigen头文件）：
+
+```bash
+g++ -std=c++14 -O2 -Wall -Wextra -Wpedantic -I include -isystem /usr/include/eigen3 \
+  src_gazebo/box_qp_solver.cpp test/test_box_qp_standalone.cpp -o /tmp/elfin5_qp_test
+/tmp/elfin5_qp_test test/qp_reference_cases.txt 2000
+python3 test/test_qp_input_files.py /tmp/elfin5_qp_test
+```
+
+程序先执行40项解析断言，再要求完整读取指定数量的参考用例，独立检查有限值、原始约束、双向目标差、KKT和收敛标志。缺失、空或损坏文件必须非零退出。生成新种子的命令、参考集溯源及计时边界见[QP算法](qp_solver.md)。独立计时不是整个控制周期，也不是最坏实时保证。
+
 在仓库根目录，使用C++14编译器：
 
 ```bash
@@ -70,7 +81,7 @@ rostest使用测试master，未启动EtherCAT或实际控制器。夹具生成�
 - QP收敛/失败状态，不把可行未收敛当完整求解成功。
 
 目前自动脚本保存误差范数及迭代/残差，未自动提供XYZ分量、求解耗时和完整时序统计。需要补齐原始字段后再报告对应指标。
-现有交替投影求解器存在已知盒/半空间最优性和误判不可行风险；基础gtest不能覆盖全部正确性，须单独修复验证。
+求解器数值回归已覆盖盒/半空间反例、缩放、预算和独立KKT检查；Gazebo仍须重新运行，不能从数值测试推断轨迹不变。无活跃限制时的关节居中行为、活跃约束及奇异区恢复都要记录。R5/R6按各自到达/改善要求，R7/R8才使用配置中的允许安全终态，R9检查超时处置；不要把R5–R8套成同一种判据。
 
 ## 4. 真机分阶段验收
 

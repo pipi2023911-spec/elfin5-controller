@@ -25,6 +25,7 @@ ROS1 机械臂实验包：通过 QP 计算六轴关节速度，跟踪末端 XYZ 
 - [操作与编译](docs/usage.md)：环境准备、仿真、影子计算、人工放行、关闭/复位和数据分析。
 - [接口说明](docs/interfaces.md)：话题、服务、参数、坐标、时间与故障行为。
 - [测试说明](docs/testing.md)：独立 C++、Python 离线、ROS 隔离、Gazebo 和现场验收。
+- [QP算法与验收](docs/qp_solver.md)：有效集、半空间乘子搜索、残差定义与数值回归。
 
 ```bash
 cd ~/catkin_ws
@@ -47,7 +48,7 @@ Gazebo 启动后还需提供基座位姿、目标并显式启用 QP；完整步�
 | `include/elfin5_qp_controller/box_qp_solver.h` | QP 解状态与求解器接口 |
 | `include/elfin5_qp_controller/qp_cartesian_controller.h` | XYZ 控制器成员、回调与运动学接口 |
 | `include/elfin5_qp_controller/real_robot_command_gate.h` | 纯 C++ 限值、候选校验、保持命令接口 |
-| `src_gazebo/box_qp_solver.cpp` | 投影梯度与盒/半空间约束求解 |
+| `src_gazebo/box_qp_solver.cpp` | 盒有效集与半空间乘子搜索，完整KKT证书判定 |
 | `src_gazebo/qp_cartesian_controller.cpp` | FK/Jacobian、XYZ误差、QP组装、约束、奇异规避、候选发布 |
 | `src_gazebo/qp_cartesian_controller_node.cpp` | QP ROS 入口与回调线程 |
 | `src/real_robot_command_gate.cpp` | 名称映射、时间/限位/插值包络检查及零端点速度保持构造 |
@@ -63,7 +64,12 @@ Gazebo 启动后还需提供基座位姿、目标并显式启用 QP；完整步�
 | `scripts/run_qp_test_suite.py` | Gazebo多轮实验、录包、CSV与结果汇总；目标Python2.7 |
 | `scripts/prepare_real_robot_description.py` | 离线核对完整URDF并原样输出，不修改厂家模型 |
 | `scripts/plot_real_robot_error.py` | 分析rosbag，输出TCP误差、关节参考/反馈/误差、统计与事件图 |
-| `test/test_box_qp_solver.cpp` | QP基础数值测试，不能替代充分最优性验证 |
+| `scripts/gen_qp_reference_cases.py` | 开发机Python3/NumPy/SciPy参考集生成，保存种子、版本与拒收次数 |
+| `test/test_box_qp_solver.cpp` | GoogleTest解析解、零法向、约束缩放、预算与异常输入测试 |
+| `test/test_box_qp_standalone.cpp` | 无ROS/gtest的解析与随机回归，独立检查约束、双向目标差及KKT |
+| `test/qp_reference_cases.txt` | 固定2000组六维可行合成QP与参考目标值 |
+| `test/qp_reference_cases.meta.json` | 固定参考集来源、数量、分组、SHA256及证据边界 |
+| `test/test_qp_input_files.py` | 开发机Python3验证缺失、空、截断、非有限和数量不符文件必须失败 |
 | `test/test_real_robot_command_gate.cpp` | GoogleTest命令检查与名称/时间规则测试 |
 | `test/test_gate_standalone.cpp` | 不依赖ROS/Eigen/GoogleTest的命令与保持核心回归 |
 | `test/test_bridge_callbacks.py` | Python3开发机编译实际网关方法，使用ROS桩验证放行/故障/保持；不代替ROS集成 |
@@ -73,11 +79,14 @@ Gazebo 启动后还需提供基座位姿、目标并显式启用 QP；完整步�
 | `docs/interfaces.md` | 所有业务接口和故障保持契约 |
 | `docs/usage.md` | 编译、仿真、影子、现场操作和记录 |
 | `docs/testing.md` | 测试层级、命令、判定与未验证边界 |
+| `docs/qp_solver.md` | QP数学问题、算法、总预算、残差及复现说明 |
 
 ## 验证边界
 
 独立 C++ 测试验证命令与保持构造，Python 离线检查验证纯函数及接线文本。ROS 集成、实际 JTC 插值、Gazebo 性能、总线故障处理和真机停止保持需分别执行。
 
-投影求解器的盒/半空间交替投影仍存在最优性与可行性判定风险；基础用例通过不能证明完整正确性。在补齐数值反例及修复之前，不将该算法描述为已充分验证的真机控制器。
+QP采用盒有效集和带区间保护的半空间乘子搜索，求解接口保持不变。独立数值验收覆盖40项解析断言、固定2000组和新种子2000组合成问题、10项真实GoogleTest及10项文件契约检查。测试在Windows/Zig C++14上执行，Eigen3.4.1和3.3.4均完成数值验证。旧Eigen与本机新版Clang组合需要仅用于本机兼容测试的延迟模板解析选项，不代表Ubuntu/GCC/catkin已验证。
+
+`success`仅表示容差内可行，`converged`还须通过KKT检查。兼容字段`projected_gradient_norm`现在表示归一化KKT残差，不与旧投影梯度残差混比。合成测试比例不是现场故障率，开发机计时不是硬实时上限。完整ROS构建、Gazebo R1–R9与真机需分别验收；准确求解后关节居中及奇异区行为可能变化。
 
 默认真机配置限值为空、现场审查关闭。站点 `stop_hold` 服务不由本包伪造；必须接入并验证真实停止保持动作。厂家 `disable_robot` 和 `stop_teleop` 不能直接冒充相同契约。总线中断时仍需已验证的执行层看门狗和现场独立停止设施。
