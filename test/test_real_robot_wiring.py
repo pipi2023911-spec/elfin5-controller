@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # ROS隔离接线测试夹具，只能由test_real_robot_wiring.test在独立测试master运行。
-# 本文件故意生成假JointState、定位、目标、JTC状态和硬件OK，并提供假停止服务。
+# 本文件生成假JointState、定位、目标、JTC和厂家Bool状态，并提供假停止保持服务。
 # 这些假接口用于验证网关状态机，严禁连接真机master或复制为现场监督适配器。
 # 测试路径：READY仍零输出 → 显式启用后有输出 → 停发反馈触发锁存/stop →
 # 恢复数据不自启 → reset后仍零输出 → 手动关闭回观察 → 停止失败锁存与显式重试。
@@ -22,7 +22,7 @@ from control_msgs.msg import JointTrajectoryControllerState
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
 from controller_manager_msgs.srv import ListControllers, ListControllersResponse
 from controller_manager_msgs.msg import ControllerState, HardwareInterfaceResources
-from std_msgs.msg import String
+from std_msgs.msg import String, Bool
 from std_srvs.srv import Trigger, TriggerResponse, SetBool
 
 # 夹具生命周期由unittest管理；setUp连接假接口，tearDown退出后台发布线程并注销。
@@ -32,7 +32,7 @@ class Wiring(unittest.TestCase):
         self.names=["elfin_joint%d" % i for i in range(1,7)]
         self.running=True;self.send_joint=True;self.outputs=[];self.stops=0;self.mode=""
         self.tf_edges=set();self.current_point=None;self.frame_valid=False
-        self.send_monitor=False;self.hardware_level=0;self.stop_success=True
+        self.send_monitor=False;self.hardware_level=0;self.stop_success=True;self.bad_command=False
         # 两个服务只在elfin5_test下使用；stop成功回执是假的，不表示物理停车能力。
         self.services=[
             rospy.Service("/elfin5_test/list",ListControllers,self.controllers),
@@ -44,12 +44,12 @@ class Wiring(unittest.TestCase):
             rospy.Subscriber("/tf_static",TFMessage,self.transforms),
             rospy.Subscriber("/elfin5_real/frame_monitor/current_point",PointStamped,self.point),
             rospy.Subscriber("/elfin5_real/frame_monitor/tracking_state",DiagnosticArray,self.frame_status)]
-        # 保持Publisher对象存活，确保ROS图能看到测试发布者，供网关检查命令来源。
+        # 保持测试Publisher对象存活。
         self.pubs={}
         for key,topic,typ in [
             ("j","/elfin5_test/joints",JointState),("b","/elfin5_test/base",PoseStamped),
             ("t","/elfin5_test/target",PointStamped),("c","/elfin5_test/controller",JointTrajectoryControllerState),
-            ("h","/elfin5_test/hardware",DiagnosticArray),("q","/elfin5_real/qp_candidate/state",DiagnosticArray),
+            ("h","/elfin5_test/fault",Bool),("enabled","/elfin5_test/enabled",Bool),
             ("m","/elfin5_real/monitor/tracking_state",DiagnosticArray),
             ("cmd","/elfin5_real/candidate_trajectory",JointTrajectory)]:
             self.pubs[key]=rospy.Publisher(topic,typ,queue_size=1)
@@ -59,7 +59,7 @@ class Wiring(unittest.TestCase):
         self.enable=rospy.ServiceProxy("/elfin5_real/bridge/enable",SetBool)
         self.reset=rospy.ServiceProxy("/elfin5_real/bridge/reset",Trigger)
         self.thread=threading.Thread(target=self.feed);self.thread.daemon=True;self.thread.start()
-    # 返回符合门禁契约的控制器名、running状态、位置接口和六轴占用资源。
+    # 人工放行时查询测试控制器，不依赖ROS图轮询。
     def controllers(self,req):
         c=ControllerState();c.name="elfin_arm_controller";c.state="running"
         c.type="position_controllers/JointTrajectoryController"
@@ -95,17 +95,18 @@ class Wiring(unittest.TestCase):
             t=PointStamped();t.header=b.header;t.point.x=1.;t.point.y=3.;t.point.z=.5;self.pubs["t"].publish(t)
             c=JointTrajectoryControllerState();c.header.stamp=stamp;c.joint_names=self.names
             c.actual.positions=[0.]*6;c.desired.positions=[0.]*6;c.desired.velocities=[0.]*6;self.pubs["c"].publish(c)
-            for key,name,identity,message in [("h","elfin5_hardware","test_robot","test_ok"),
-                                                ("q","elfin5_qp_controller","test","REACHED: test_hold"),
-                                                ("m","elfin5_real_tracking","test","valid")]:
+            self.pubs["h"].publish(Bool(data=self.hardware_level != 0))
+            self.pubs["enabled"].publish(Bool(data=True))
+            for key,name,identity,message in [("m","elfin5_real_tracking","test","valid")]:
                 if key=="m" and not self.send_monitor:continue
                 d=DiagnosticArray();d.header.stamp=stamp
                 s=DiagnosticStatus();s.name=name;s.hardware_id=identity;s.message=message
-                s.level=self.hardware_level if key=="h" else (1 if key=="m" else 0)
+                s.level=1
                 d.status=[s];self.pubs[key].publish(d)
             # 合成零位保持候选；即使无位移，也应被OBSERVE/READY/FAULT状态完全隔离。
             cmd=JointTrajectory();cmd.header.stamp=stamp;cmd.joint_names=self.names
             p=JointTrajectoryPoint();p.positions=[0.]*6;p.velocities=[0.]*6;p.time_from_start=rospy.Duration(.1)
+            if self.bad_command:p.positions[0]=float("nan")
             cmd.points=[p];self.pubs["cmd"].publish(cmd)
             time.sleep(.02)
     # 使用有限墙钟等待，条件长期不满足会明确失败，不让测试无限挂起。
@@ -155,7 +156,10 @@ class Wiring(unittest.TestCase):
         self.wait(lambda:len(self.outputs)>count)
         stops=self.stops
         self.assertTrue(self.enable(False).success)
-        self.wait(lambda:self.stops>stops and self.mode=="READY")
+        self.wait(lambda:self.stops>stops and self.mode=="FAULT_LATCHED")
+        time.sleep(.15)
+        self.assertTrue(self.reset().success)
+        self.wait(lambda:self.mode=="READY")
         count=len(self.outputs);time.sleep(.2)
         self.assertEqual(count,len(self.outputs),"正常关闭后自动恢复了运动")
         # 真硬件故障仍锁存；停止失败不能通过reset清除，也不能自动重试。
@@ -179,6 +183,18 @@ class Wiring(unittest.TestCase):
         self.assertTrue(self.reset().success)
         self.wait(lambda:self.mode=="READY")
         self.assertEqual(len(self.outputs),count)
+        # 非法候选触发一次保持；输出必须来自实际反馈零位，不能包含NaN。
+        self.assertTrue(self.enable(True).success)
+        self.wait(lambda:len(self.outputs)>count)
+        count=len(self.outputs);stops=self.stops;self.bad_command=True
+        self.wait(lambda:self.mode=="FAULT_LATCHED" and self.stops>stops)
+        self.wait(lambda:len(self.outputs)>count)
+        held=self.outputs[-1].points[0]
+        self.assertEqual(list(held.positions),[0.]*6)
+        self.assertEqual(list(held.velocities),[0.]*6)
+        self.assertGreater(held.time_from_start.to_sec(),0)
+        count=len(self.outputs);time.sleep(.2)
+        self.assertEqual(len(self.outputs),count,"保持目标不得持续追逐反馈或透传非法候选")
         competing=TransformStamped();competing.header.stamp=rospy.Time.now()
         competing.header.frame_id="absolute_world";competing.child_frame_id="world"
         competing.transform.rotation.w=1

@@ -47,4 +47,13 @@ bool checkCommand(const HardwareLimits& limits, const HardwareCommand& command,
                   const std::vector<double>& reference_velocity,
                   double now, double epoch, double previous_stamp,
                   double max_age, std::string& reason);
+// 位置“安全”仅指有限且位于已配置限位内，不代表碰撞或现场几何已验证。
+bool positionsWithinLimits(const HardwareLimits& limits, const std::vector<double>& positions);
+// 以最近有效实际反馈为保持目标，端点速度为零，仍通过同一插值包络检查。
+// 调用方须先确认反馈新鲜、驱动可用；本函数不连接硬件、不证明已经停稳。
+bool makeHoldCommand(const HardwareLimits& limits, const std::vector<double>& safe_pose,
+                     const std::vector<double>& reference,
+                     const std::vector<double>& reference_velocity,
+                     double now, double horizon, HardwareCommand& hold, std::string& reason);
+std::string commandReasonChinese(const std::string& reason);
 }  // namespace elfin5_qp_controller

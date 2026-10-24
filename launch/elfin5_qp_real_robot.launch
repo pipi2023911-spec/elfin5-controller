@@ -25,10 +25,10 @@
     <node pkg="elfin5_qp_controller" type="elfin5_qp_controller_node" name="qp_candidate"
           output="screen" required="true">
       <!-- V2源码使用绝对话题，必须显式重映射；仅放入group namespace不能隔离。 -->
-      <remap from="/joint_states" to="/elfin5_real/validated/joint_states"/>
-      <!-- QP只能接收网关已经检查过的定位和目标输入。 -->
-      <remap from="~base_pose" to="/elfin5_real/validated/base_pose"/>
-      <remap from="~target_point" to="/elfin5_real/validated/target_point"/>
+      <remap from="/joint_states" to="/joint_states"/>
+      <!-- QP自己检查算法输入；网关只审查真实输出边界。 -->
+      <remap from="~base_pose" to="/base_pose"/>
+      <remap from="~target_point" to="/target_point"/>
       <!-- 最关键的输出隔离：V2所有轨迹及异常hold都只到候选通道。 -->
       <remap from="/elfin_arm_controller/command" to="/elfin5_real/candidate_trajectory"/>
       <remap from="robot_description" to="/robot_description"/>

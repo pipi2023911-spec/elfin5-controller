@@ -1,87 +1,56 @@
-# 真机接入参数说明：本文件以只读观察/影子计算为默认状态。
-# 现场复制为站点配置后填写已核验限值和适配接口；不是修改原V2算法的地方。
-# bridge负责能否发送真实轨迹，monitor负责显示/误差，qp_candidate只生成隔离候选。
-# 位置/角度使用m、rad，时间使用s；速度/加速度使用rad/s、rad/s²。
-# 参数在节点启动时读取，修改文件不会热更新；按README停止后再重启。
-
-# 2026-10-13现场信息：用户目前只有源码，尚无实测周期、最大延迟及停止/看门狗说明。
-# 下列时间数值保持原值、未通过真机核验；待用户提供证据后局部调整，不为通过门禁放宽。
-# 记录位置：docs/usage.md。
-# 默认只观察或影子计算。
-# 默认限值未经现场调试；空数组阻止进入 ACTIVE。
-# 网关私有参数：所有放行条件都满足并显式调用enable后，才可能向厂家command发消息。
+# 真机站点配置：默认只观察/影子计算，不输出运动。
+# 数组按J1..J6填写，不复制厂家PDO的[J2,J1,...]顺序。
 bridge:
   joint_names: [elfin_joint1, elfin_joint2, elfin_joint3, elfin_joint4, elfin_joint5, elfin_joint6]
-  world_frame: absolute_world
-  # 本站审查记录开关，默认false。改成true本身不能证明接口、停止或限值已验证。
+  # 只有现场核验了限值、反馈/总线失效处理、JTC插值及停止保持后才可设为true。
   site_review_complete: false
-  # 必须与现场监督诊断中的设备ID完全一致；空字符串有意阻断实际放行。
-  hardware_id: ""  # 与现场互锁诊断中的设备标识严格一致
-  hardware_status_name: elfin5_hardware
-  # 该话题由现场监督适配器提供，不是本包伪造的OK心跳。
-  hardware_status_topic: /elfin5_hardware/status
-  # Trigger停止契约由现场接到已验证的停止动作；不能配置成始终返回成功的空服务。
-  stop_service: /elfin5_site/stop  # std_srvs/Trigger，由站点提供，不是厂家接口别名
-  list_controllers_service: /controller_manager/list_controllers
+  joint_states_topic: /joint_states
+  controller_state_topic: /elfin_arm_controller/state
+  enable_state_topic: /elfin_ros_control/elfin/enable_state
+  fault_state_topic: /elfin_ros_control/elfin/fault_state
   controller_name: elfin_arm_controller
   controller_type: position_controllers/JointTrajectoryController
-  joint_states_topic: /joint_states
-  base_pose_topic: /base_pose
-  target_point_topic: /target_point
-  controller_state_topic: /elfin_arm_controller/state
-  command_topic: /elfin_arm_controller/command
-  # 候选通道必须与实际command不同；launch中的重映射和candidate_node身份也要一致。
+  list_controllers_service: /controller_manager/list_controllers
   candidate_topic: /elfin5_real/candidate_trajectory
-  candidate_node: /elfin5_real/qp_candidate
-  # 以下五组数组按joint_names顺序填六个有限数；默认空数组使网关无法就绪。
-  # 位置上下界还会与URDF核对，禁止越出模型；step是单次端点对反馈/参考的最大偏移。
+  command_topic: /elfin_arm_controller/command
+  # 站点提供std_srvs/Trigger：停止当前运动并保持；不是空回执或disable_robot别名。
+  stop_service: /elfin5_site/stop_hold
   position_lower: []
   position_upper: []
   velocity_limits: []
   acceleration_limits: []
   max_endpoint_step: []
-  # 每类输入的源时间/接收时间限值；目标固定也必须有真实上游心跳。
+  # 示例时间参数均待实测，不能当成已验证的实时/安全指标。
   input_timeout: 0.3
-  # 不同源之间可接受的时间差，不等于严格同步精度。
   max_input_skew: 0.08
-  # 候选从生成到网关检查的最大年龄；过期端点不能靠重打时间戳继续发。
   candidate_max_age: 0.02
-  # ACTIVE中持续收不到合格候选时触发锁存停止请求。
   candidate_timeout: 0.15
   min_horizon: 0.02
   max_horizon: 0.15
+  hold_horizon: 0.10
 
-# 只读监视参数：决定FK坐标含义、TF发布责任和可视历史长度。
+# 监视器只读计算FK/误差和显示，不参与网关放行。
 monitor:
   joint_names: [elfin_joint1, elfin_joint2, elfin_joint3, elfin_joint4, elfin_joint5, elfin_joint6]
   world_frame: absolute_world
-  # 厂家模型根随基座运动；与上方固定的绝对坐标系必须不同。
   model_root_frame: world
   base_link: elfin_base_link
   tip_link: elfin_end_link
-  # pose 与 external 二选一；absolute_world→world 只能由一个来源发布。
-  base_tf_mode: pose  # pose：本节点发布；external：核对外部 TF，不发布
+  base_tf_mode: pose
   base_tf_position_tolerance: 0.001
   base_tf_angle_tolerance: 0.001
   joint_states_topic: /joint_states
   base_pose_topic: /base_pose
   target_point_topic: /target_point
   controller_state_topic: /elfin_arm_controller/state
-  # 每类输入的源时间/接收时间限值；目标固定也必须有真实上游心跳。
   input_timeout: 0.3
-  # 不同源之间可接受的时间差，不等于严格同步精度。
   max_input_skew: 0.08
-  # 历史位置轨迹的内存上限；这不是未来控制轨迹点数。
   path_max_points: 2000
 
-# 仅覆写候选QP的低速影子起始参数，原始算法及原仿真YAML保持不变。
-# 这些倍率不能代替真实硬件限值；需与bridge的已核验限制共同评估。
+# QP只生成候选，不直接控制真实JTC。姿态不作为主动控制目标。
 qp_candidate:
-  # 仅真机改用绝对参考系；仿真配置仍使用 world。
   absolute_frame: absolute_world
-  # 低速影子计算起始值；核验现场限制后再调整。
   maximum_cartesian_speed: 0.01
   velocity_limit_scale: 0.05
   acceleration_limit_scale: 0.02
-  # 每类输入的源时间/接收时间限值；目标固定也必须有真实上游心跳。
   input_timeout: 0.3

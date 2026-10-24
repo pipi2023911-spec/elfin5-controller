@@ -91,7 +91,9 @@ class OfflineChecks(unittest.TestCase):
         candidate=[n for n in root.findall(".//node") if n.get("name")=="qp_candidate"][0]
         remaps=dict((r.get("from"),r.get("to")) for r in candidate.findall("remap"))
         self.assertEqual(remaps["/elfin_arm_controller/command"],"/elfin5_real/candidate_trajectory")
-        self.assertNotEqual(remaps["/joint_states"],"/joint_states")
+        self.assertEqual(remaps["/joint_states"],"/joint_states")
+        self.assertEqual(remaps["~base_pose"],"/base_pose")
+        self.assertEqual(remaps["~target_point"],"/target_point")
         self.assertEqual(remaps["robot_description"],"/robot_description")
         self.assertFalse(root.findall(".//param[@name='robot_description']"))
         context=root.find(".//include/arg[@name='robot_description']")

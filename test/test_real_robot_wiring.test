@@ -38,16 +38,16 @@ velocity_limits: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
 acceleration_limits: [10, 10, 10, 10, 10, 10]
 max_endpoint_step: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
 site_review_complete: true
-hardware_id: test_robot
+hold_horizon: 0.1
 joint_states_topic: /elfin5_test/joints
 base_pose_topic: /elfin5_test/base
 target_point_topic: /elfin5_test/target
 controller_state_topic: /elfin5_test/controller
-hardware_status_topic: /elfin5_test/hardware
+enable_state_topic: /elfin5_test/enabled
+fault_state_topic: /elfin5_test/fault
 command_topic: /elfin5_test/command
 list_controllers_service: /elfin5_test/list
 stop_service: /elfin5_test/stop
-candidate_node: /elfin5_real/test_real_robot_wiring
 candidate_max_age: 0.05
       </rosparam>
     </node>

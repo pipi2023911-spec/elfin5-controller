@@ -1,44 +1,83 @@
-# Elfin5 QP 控制器
+# Elfin5 XYZ QP 控制器
 
-面向机械臂控制算法研究的 ROS 包，包含当前 V2 QP 控制器、Gazebo 仿真入口，以及通过厂家 EtherCAT 驱动和 JTC 接入真机的接口。
+ROS1 机械臂实验包：通过 QP 计算六轴关节速度，跟踪末端 XYZ 位置，输出单点短时域关节轨迹。姿态允许变化，不主动控制姿态。
 
-末端只跟踪 XYZ，允许姿态变化。真机的 `absolute_world` 是固定绝对坐标系；基座可以移动，基座位姿和目标点均在该坐标系中表达。厂家模型中的 `world` 与 `elfin_base_link` 始终重合，并一起运动。仿真配置仍使用原来的 `world`。
+支持 Gazebo 实验、读取真机反馈的影子计算，以及默认关闭的真机薄网关。代码存在、编译通过、仿真通过和真机闭环验证属于不同完成等级。
 
-控制链：真实反馈 → QP 候选轨迹 → 硬件命令网关 → 厂家位置 JTC → RobotHW → EtherCAT。真机启动文件默认打开 RViz，支持末端位置误差范数和六个关节过程跟踪误差的记录、绘图。
+## 控制链与职责
 
-## 文档入口
+```text
+关节反馈 + 基座位姿 + 目标XYZ → QP → 候选轨迹
+                                      ↓
+                         网关：人工放行、命令检查
+                                      ↓
+                  厂家位置型JTC → RobotHW → EtherCAT
+```
 
-- [当前接口](docs/interfaces.md)：输入输出、服务、诊断、状态机及配置约定。
-- [基本使用](docs/usage.md)：编译、现场观察、影子计算、人工放行与停止、误差绘图。
+网关不代理 QP 输入、不扫描 ROS 图、不解析 QP 诊断文本、不自动使能或清除厂家故障。监视器与 RViz 只负责显示和记录。
 
-## 环境与依赖
+故障时先阻断候选并锁存：反馈和设备仍有效时，请求保持最近通过限位检查的实际反馈姿态，保持端点速度为零；反馈失效、驱动故障或保持轨迹检查失败时，不向旧姿态回拉，调用现场已验证的停止保持服务。保持请求和服务成功回执都不能单独证明机械臂已经静止。详见[接口与故障保持](docs/interfaces.md)。
 
-目标环境为 Ubuntu 18.04、ROS Melodic、Python 2.7。将本仓库与设备对应的厂家 ROS 包放入同一 catkin 工作空间的 `src`；ROS 包名为 `elfin5_qp_controller`，同一工作空间只保留一份。
+## 环境与入口
 
-厂家源码参考：[huayan-robotics/elfin_robot 的 melodic 分支](https://github.com/huayan-robotics/elfin_robot/tree/melodic)。设备专属标定、驱动配置及实际部署版本需现场核对。
+目标环境：Ubuntu 18.04、ROS Melodic、Python 2.7、C++14、Eigen、MoveIt。厂家包应与设备及现场标定一致。厂家驱动中的数组可能按 J2/J1 排列，本包按关节名称映射，不能直接按索引混用。
 
-## 文件分工
+- [操作与编译](docs/usage.md)：环境准备、仿真、影子计算、人工放行、关闭/复位和数据分析。
+- [接口说明](docs/interfaces.md)：话题、服务、参数、坐标、时间与故障行为。
+- [测试说明](docs/testing.md)：独立 C++、Python 离线、ROS 隔离、Gazebo 和现场验收。
 
-| 目录 | 用途 |
+```bash
+cd ~/catkin_ws
+catkin_make
+source devel/setup.bash
+roslaunch elfin5_qp_controller elfin5_qp_gazebo.launch
+```
+
+Gazebo 启动后还需提供基座位姿、目标并显式启用 QP；完整步骤在操作文档。真机入口不启动 EtherCAT 或厂家控制器。
+
+## 全部文件说明
+
+| 文件 | 职责 |
 |---|---|
-| `src_gazebo/`、`include/` | 现有 QP 求解器、笛卡尔控制器及接口头文件 |
-| `src/` | 真机命令网关、命令检查、只读监视 |
-| `launch/`、`config/` | 仿真/真机入口、算法和站点参数、RViz 配置 |
-| `scripts/` | 完整模型离线核验、误差绘图和仿真测试工具 |
-| `test/` | 求解器、命令检查、模型/误差及 ROS 接线测试 |
-| `docs/` | 当前接口与基本使用说明 |
+| `README.md` | 项目范围、文件导航和验证边界 |
+| `CMakeLists.txt` | 构建库/节点、安装脚本/文档、注册测试 |
+| `package.xml` | ROS 编译、运行和测试依赖 |
+| `.gitignore` | 排除构建、录包、日志和本机缓存 |
+| `.gitattributes` | Git 文本文件属性 |
+| `include/elfin5_qp_controller/box_qp_solver.h` | QP 解状态与求解器接口 |
+| `include/elfin5_qp_controller/qp_cartesian_controller.h` | XYZ 控制器成员、回调与运动学接口 |
+| `include/elfin5_qp_controller/real_robot_command_gate.h` | 纯 C++ 限值、候选校验、保持命令接口 |
+| `src_gazebo/box_qp_solver.cpp` | 投影梯度与盒/半空间约束求解 |
+| `src_gazebo/qp_cartesian_controller.cpp` | FK/Jacobian、XYZ误差、QP组装、约束、奇异规避、候选发布 |
+| `src_gazebo/qp_cartesian_controller_node.cpp` | QP ROS 入口与回调线程 |
+| `src/real_robot_command_gate.cpp` | 名称映射、时间/限位/插值包络检查及零端点速度保持构造 |
+| `src/real_robot_bridge_node.cpp` | 人工输出开关、厂家状态监督、故障锁存、一次保持与异步停止请求 |
+| `src/real_robot_monitor_node.cpp` | 基座与关节反馈的FK、TF责任检查、TCP/关节误差与可视化 |
+| `launch/elfin5_qp_controller.launch` | 单独加载 QP，依赖外部模型和执行环境 |
+| `launch/elfin5_qp_gazebo.launch` | 厂家 Gazebo、MoveIt 与 QP 入口，不加载真机网关 |
+| `launch/elfin5_qp_real_robot.launch` | 真机候选 QP、网关、监视器与可选 RViz |
+| `config/elfin5_qp_controller.yaml` | QP参数、控制频率、关节约束和奇异阈值 |
+| `config/elfin5_real_robot.yaml` | 真机限值、厂家状态/停止接口、监视与低速候选参数 |
+| `config/elfin5_real_robot.rviz` | absolute_world 下的模型、TF、轨迹和目标显示 |
+| `config/qp_test_suite.yaml` | Gazebo轮次、初始姿态、目标和判定阈值 |
+| `scripts/run_qp_test_suite.py` | Gazebo多轮实验、录包、CSV与结果汇总；目标Python2.7 |
+| `scripts/prepare_real_robot_description.py` | 离线核对完整URDF并原样输出，不修改厂家模型 |
+| `scripts/plot_real_robot_error.py` | 分析rosbag，输出TCP误差、关节参考/反馈/误差、统计与事件图 |
+| `test/test_box_qp_solver.cpp` | QP基础数值测试，不能替代充分最优性验证 |
+| `test/test_real_robot_command_gate.cpp` | GoogleTest命令检查与名称/时间规则测试 |
+| `test/test_gate_standalone.cpp` | 不依赖ROS/Eigen/GoogleTest的命令与保持核心回归 |
+| `test/test_bridge_callbacks.py` | Python3开发机编译实际网关方法，使用ROS桩验证放行/故障/保持；不代替ROS集成 |
+| `test/test_real_robot_tf_and_error.py` | URDF夹具、误差函数与launch接线的离线检查 |
+| `test/test_real_robot_wiring.py` | 假反馈/假状态/假停止的ROS隔离夹具，禁止接真机master |
+| `test/test_real_robot_wiring.test` | 隔离网关、监视器与模型发布器的rostest入口 |
+| `docs/interfaces.md` | 所有业务接口和故障保持契约 |
+| `docs/usage.md` | 编译、仿真、影子、现场操作和记录 |
+| `docs/testing.md` | 测试层级、命令、判定与未验证边界 |
 
-## 本次修改（2026-10-16）
+## 验证边界
 
-- 保留厂家完整 `/robot_description` 和 `world_base`；移除 QP 真机入口中的重复 `robot_state_publisher` 和私有模型生成步骤。
-- monitor 在 pose 模式发布 `absolute_world → world`；厂家 bringup 继续发布所有模型内部 TF。external 模式由定位系统提供该动态边，monitor 只核对。
-- 真机 QP、网关、监视器与 RViz 统一使用 `absolute_world`。控制算法、关节约束、通信阈值及四状态网关逻辑保持不变。
-- 本包的运行说明、服务回复和故障原因改为中文；英文状态码、接口名称和诊断键保留，保证已有程序解析兼容。ROS、MoveIt 和厂家库自身的提示由这些组件负责。
+独立 C++ 测试验证命令与保持构造，Python 离线检查验证纯函数及接线文本。ROS 集成、实际 JTC 插值、Gazebo 性能、总线故障处理和真机停止保持需分别执行。
 
-更新后先退出旧 QP 真机 launch，再启动新版；不要同时运行两版。已有站点 YAML 必须同步将 `bridge.world_frame`、`monitor.world_frame`、`qp_candidate.absolute_frame` 设为 `absolute_world`，并设置 `monitor.model_root_frame: world`。定位与目标消息的 `header.frame_id` 也须更新，坐标值应确实处于该绝对系，不能只改标签冒充坐标变换。现场步骤见[基本使用](docs/usage.md)。
+投影求解器的盒/半空间交替投影仍存在最优性与可行性判定风险；基础用例通过不能证明完整正确性。在补齐数值反例及修复之前，不将该算法描述为已充分验证的真机控制器。
 
-## 当前使用边界
-
-默认配置用于观察和影子计算：真实关节限值为空、现场审查开关关闭，不能直接放行运动。现场硬件状态适配器和停止服务需另行接入；本包不自动使能驱动器或清除厂家故障。
-
-已有 Python 离线检查通过；完整 ROS 构建、ROS 隔离测试和真机验证尚未完成。通信周期、最大延迟及厂家停止/看门狗资料尚未取得，现有超时参数不能作为真机验收依据。具体操作及待核实项见[基本使用](docs/usage.md)。
+默认真机配置限值为空、现场审查关闭。站点 `stop_hold` 服务不由本包伪造；必须接入并验证真实停止保持动作。厂家 `disable_robot` 和 `stop_teleop` 不能直接冒充相同契约。总线中断时仍需已验证的执行层看门狗和现场独立停止设施。

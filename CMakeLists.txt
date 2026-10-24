@@ -114,6 +114,9 @@ install(FILES README.md
 # 测试分工：纯C++规则、ROS隔离状态机、Python模型/误差检查。
 # 没有开启或运行这些测试时，不能仅凭构建成功声称功能验证通过。
 if(CATKIN_ENABLE_TESTING)
+  add_executable(test_gate_standalone test/test_gate_standalone.cpp)
+  target_link_libraries(test_gate_standalone elfin5_real_command_gate)
+  add_test(NAME gateway_core COMMAND test_gate_standalone)
   find_package(rostest REQUIRED)
   find_package(PythonInterp REQUIRED)
   catkin_install_python(PROGRAMS test/test_real_robot_wiring.py

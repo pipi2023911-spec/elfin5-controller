@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cmath>
 #include <set>
+#include <utility>
 
 namespace elfin5_qp_controller {
 namespace {
@@ -117,5 +118,46 @@ bool checkCommand(const HardwareLimits& l, const HardwareCommand& c,
         return reject("cubic_acceleration_envelope",reason);
   }
   reason="accepted"; return true;  // 只有全部检查通过后才报告接受；实际发布仍由网关决定。
+}
+bool positionsWithinLimits(const HardwareLimits& l, const std::vector<double>& q) {
+  if(!finiteVector(q,l.names.size()) || q.size()!=6 ||
+     !finiteVector(l.lower,q.size()) || !finiteVector(l.upper,q.size())) return false;
+  for(std::size_t i=0;i<q.size();++i)
+    if(l.lower[i]>l.upper[i] || q[i]<l.lower[i] || q[i]>l.upper[i]) return false;
+  return true;
+}
+
+bool makeHoldCommand(const HardwareLimits& l, const std::vector<double>& safe_pose,
+                     const std::vector<double>& ref, const std::vector<double>& ref_v,
+                     double now, double horizon, HardwareCommand& hold, std::string& reason) {
+  hold=HardwareCommand();
+  if(!positionsWithinLimits(l,safe_pose)) return reject("position_limit",reason);
+  HardwareCommand candidate;
+  candidate.stamp=now; candidate.horizon=horizon; candidate.names=l.names;
+  candidate.positions=safe_pose; candidate.velocities.assign(safe_pose.size(),0.0);
+  if(!checkCommand(l,candidate,safe_pose,ref,ref_v,now,0,0,horizon,reason)) return false;
+  hold=candidate; return true;
+}
+
+std::string commandReasonChinese(const std::string& code) {
+  const std::pair<const char*,const char*> messages[] = {
+    {"six_unique_joint_names_required","需要六个不同的关节名称"},
+    {"six_finite_site_limits_required","现场限值不完整或包含非有限数值"},
+    {"invalid_horizon_limits","轨迹时域配置无效"},
+    {"invalid_joint_limits","关节限值配置无效"},
+    {"old_future_or_replayed_candidate","候选过期、来自未来或违反激活时间及严格递增要求"},
+    {"invalid_command_horizon","候选执行时域无效"},
+    {"invalid_reference","反馈或控制器参考数组无效"},
+    {"invalid_candidate_arrays","候选关节名称、数组或数值无效"},
+    {"insufficient_remaining_horizon","剩余执行时间不足"},
+    {"position_limit","关节位置越界"},
+    {"endpoint_step_limit","端点跳变超过限制"},
+    {"cubic_position_envelope","插值位置包络越界"},
+    {"cubic_velocity_envelope","插值速度包络超限"},
+    {"cubic_acceleration_envelope","插值加速度包络超限"},
+    {"accepted","命令检查通过"}
+  };
+  for(const auto& m:messages) if(code==m.first) return m.second;
+  return "未知命令检查错误";
 }
 }  // namespace elfin5_qp_controller
