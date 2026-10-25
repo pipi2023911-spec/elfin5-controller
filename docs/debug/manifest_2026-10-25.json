@@ -1,0 +1,144 @@
+{
+  "date": "2026-10-25",
+  "head_before_documentation": "e433bbf57df9b2420311416395fc34e38afe935b",
+  "proposal_commit": "6f39bc0e9ae608b9a51ac1985a2d39d8ba56a655",
+  "rollback_commit": "c79b5f66f0c8b096a8aeb953d95ed6d5e7c13285",
+  "archive_sha256": "de0ce86e876cc8f2e6505567889c4585f08e8fe76f7c7756b01fa22cec660a48",
+  "archive_bytes": 572508,
+  "members": {
+    "proposal_at_6f39bc0/CMakeLists.txt": {
+      "sha256": "a9d29cfb3ccd70792cd14eb28128185f964184b8b6b8e2799e19ab4fee0a6c10",
+      "bytes": 5525
+    },
+    "proposal_at_6f39bc0/README.md": {
+      "sha256": "349efe94b62a7dc076a189370e0ca13c5733de409fd06a0ba72847581ef5a5b1",
+      "bytes": 8569
+    },
+    "proposal_at_6f39bc0/config/elfin5_qp_controller.yaml": {
+      "sha256": "b3e30ec1e04e88e891585207c69f8b63b2bdcb6c9e8f6c7439b07bd6ac3e75b4",
+      "bytes": 2281
+    },
+    "proposal_at_6f39bc0/config/elfin5_real_robot.yaml": {
+      "sha256": "d25697299dc90fcd881f6342e086bb427adee1f66c43951aa7e4883f15e1aae5",
+      "bytes": 2402
+    },
+    "proposal_at_6f39bc0/docs/elfin_joint_limits_reference.png": {
+      "sha256": "f6f4d502b7df67dd3e1a682787c0b105cebdda9c3bc6a2e6a1688ffca12a8170",
+      "bytes": 8091
+    },
+    "proposal_at_6f39bc0/docs/evidence/joint-limits-2026-10-25/README.md": {
+      "sha256": "fea697f6e45d2324185f92baeea68c68a12a17dd4a8e38c7eadfa09bbdd60864",
+      "bytes": 4178
+    },
+    "proposal_at_6f39bc0/docs/evidence/joint-limits-2026-10-25/limits.json": {
+      "sha256": "c62c33459c8d5b078f89ae6d6bce99a4919e0bd977c404be2c27e3b08d100a43",
+      "bytes": 4216
+    },
+    "proposal_at_6f39bc0/docs/evidence/joint-limits-2026-10-25/test_logs.zip": {
+      "sha256": "6f325870b92bb6d8438508c1d54a932ce8f5ee16105037d0050d8b5b668d7310",
+      "bytes": 507800
+    },
+    "proposal_at_6f39bc0/docs/evidence/joint-limits-2026-10-25/verification.json": {
+      "sha256": "e6f7c5dfed9061a7af2592749496e2db2c3584e53dda292b66fcf9360250e434",
+      "bytes": 1272
+    },
+    "proposal_at_6f39bc0/docs/interfaces.md": {
+      "sha256": "4dec0e767d5571eb7b34b7c4fdd4ca72f04b3f28da1da0f50fbafd72ea374cdc",
+      "bytes": 10648
+    },
+    "proposal_at_6f39bc0/docs/joint_limits.md": {
+      "sha256": "827b170fe41db85f415ac82241c769b9220022ff072e8c4940628c49b9938aa7",
+      "bytes": 5353
+    },
+    "proposal_at_6f39bc0/docs/testing.md": {
+      "sha256": "4a40af0e7fc671328fa6f6ebb76d009984b9a4eb64eebe2ef23c9d5aff154e3c",
+      "bytes": 6786
+    },
+    "proposal_at_6f39bc0/docs/usage.md": {
+      "sha256": "9d934cb1d0d1c59b211c7643c5843f34b2f9d47ac54b81e3a59948ede6d5e0f2",
+      "bytes": 8887
+    },
+    "proposal_at_6f39bc0/src_gazebo/qp_cartesian_controller.cpp": {
+      "sha256": "596840acc236e2961913c559f4049289226350e04358cdad517ddd82c7c0202a",
+      "bytes": 46129
+    },
+    "proposal_at_6f39bc0/test/test_controller_limits.py": {
+      "sha256": "930e801b57442207897deff7beb2048a388cafb138124c7deecf250f90f5585d",
+      "bytes": 8265
+    },
+    "historical_records/ELFIN5_GATEWAY_TASK_RESULT_2026-10-24.md": {
+      "sha256": "24b9a77072989c3c994071cd855319f21ae249364806844cc1f05fce6f5678d4",
+      "bytes": 3286
+    },
+    "historical_records/QP_SOLVER_TASK_RESULT_2026-10-24.md": {
+      "sha256": "0525298b9d3660cf9a4e40cb73003d96a21d2707b90e599047716caa637062b1",
+      "bytes": 3677
+    },
+    "historical_records/gateway_core_test.log": {
+      "sha256": "ef2a4705e9f852fe6a8c6e71a40b82fc71cc52f84b2fb53531d7be654a592cc4",
+      "bytes": 66
+    },
+    "historical_records/gateway_callbacks_test.log": {
+      "sha256": "281e2ca7e354520d529589264f643a56969ec0a67bf1e0525820b9ab5c9a9639",
+      "bytes": 74
+    },
+    "historical_records/qp_final_2000.log": {
+      "sha256": "3d3ade298fe3e7b8fb67fe695e9cf62523b12ad48aa995fd934d4e51f0eb2487",
+      "bytes": 155
+    },
+    "historical_records/qp_final_seed43.log": {
+      "sha256": "8b64420980a257910e2ff2a13a0107e0f5c872d778d208db946f7538ebc5c3f8",
+      "bytes": 156
+    },
+    "historical_records/qp_gtest.log": {
+      "sha256": "a94ff8f9622d87c38fc1cb1f7aadea43ed07c9ce6f3cba8a0cc8d6c569cd5574",
+      "bytes": 1537
+    },
+    "historical_records/qp_eigen334_build.log": {
+      "sha256": "37a2f4027cb863880abc572a0302402f2941c169bce1837e331bd19cd848ffb2",
+      "bytes": 1663
+    },
+    "historical_records/qp_eigen334_compat_build.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "historical_records/qp_eigen334_2000.log": {
+      "sha256": "a4b6fb9af595ed3ecebac5f6241fe708e542b7ebca6b5ccd8ee0ae1cd6f0cdf4",
+      "bytes": 156
+    },
+    "historical_records/qp_eigen334_seed43.log": {
+      "sha256": "80402398fd51befb3334bf3a4eec581b3888d7956097d92e9a9645efe83c1b42",
+      "bytes": 157
+    },
+    "historical_records/qp_gtest334.log": {
+      "sha256": "a94ff8f9622d87c38fc1cb1f7aadea43ed07c9ce6f3cba8a0cc8d6c569cd5574",
+      "bytes": 1537
+    },
+    "historical_records/qp_file_contract334.log": {
+      "sha256": "2bd7c99bd98fe7f694b319851f4545c34b39c04380976c131b1e45973e67111b",
+      "bytes": 50
+    },
+    "historical_records/qp_seed43_generation.log": {
+      "sha256": "9c58e8953c70e34320011bada337e1ff9f4dc116ce40bd46e47363ec419b7027",
+      "bytes": 400
+    },
+    "historical_records/elfin5-review-2026-10-25/REVIEW.md": {
+      "sha256": "0d963ec69d6ab68c54d9905bfd33d6585f581e96656d5e42fe851f70d66d1b21",
+      "bytes": 11879
+    },
+    "historical_records/elfin5-review-2026-10-25/review_checks.json": {
+      "sha256": "7a7e786be869836bb2b87bf72a6c1726191ee402fd0b64d4a6be6e7da6f4dabf",
+      "bytes": 4963
+    }
+  },
+  "selected_but_missing": [],
+  "unchanged_runtime_files_sha256": {
+    "config/elfin5_qp_controller.yaml": "b3e12b2b8cff1813f136fbe35d68779409ca3c690e31c4d3e393d62072f5711c",
+    "config/elfin5_real_robot.yaml": "4d0449fc07e2e8a78229a88ce79d87e70a725750dc90dca53ec7acb88ee10450",
+    "src_gazebo/box_qp_solver.cpp": "50184dfc22ab9f0e3b36ba3deedb82efb3c04ac7384bb46c492da2a9513f0a57",
+    "src_gazebo/qp_cartesian_controller.cpp": "6ba8dfd0d24a36bc0007ac84694d4e288f7a67b8a4a2a9741ef7e31296eb9200",
+    "src/real_robot_bridge_node.cpp": "1187fcdc4aaa40147a0cb5610529c031e44d4823f0d07786a148698099b0e2be",
+    "src/real_robot_command_gate.cpp": "516ef6d9a549e585ecb4bd5185ae6ad379609bc3a57c017e8349e806a6f41500"
+  },
+  "note": "历史提案已撤回。压缩包不是当前配置；本轮仅文档/归档，没有重跑算法或更改运行参数。"
+}

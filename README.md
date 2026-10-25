@@ -30,6 +30,7 @@ ROS1 机械臂实验包：通过 QP 计算六轴关节速度，跟踪末端 XYZ 
 - [QP算法与验收](docs/qp_solver.md)：有效集、半空间乘子搜索、残差定义与数值回归。
 - [stop适配器](docs/stop_adapter.md)：独立停止请求、请求后持续低速确认和Windows验证边界。
 - [时域与简化审查](docs/horizon_validation.md)：50/140 ms离线对照、回调延迟、停发代价及未实施项。
+- [Debug原因与决策记录](docs/debug_history.md)：历轮修改依据、失败、撤回和暂不应用的原因。
 
 ```bash
 cd ~/catkin_ws
@@ -91,6 +92,8 @@ Gazebo 启动后还需提供基座位姿、目标并显式启用 QP；完整步�
 | `docs/qp_solver.md` | QP数学问题、算法、总预算、残差及复现说明 |
 | `docs/stop_adapter.md` | stop接口、持续确认、失败路径、Windows与现场验证边界 |
 | `docs/horizon_validation.md` | 离线模型、21组条件、简化审查与未改变的生产参数 |
+| `docs/debug_history.md` | 修改原因、实际证据、采用/撤回/暂缓决策及学习要点 |
+| `docs/debug/README.md`、`manifest_2026-10-25.json`、`historical_evidence_2026-10-25.zip` | 历史提案完整快照和早期通过/失败记录，只供Debug，不是当前配置 |
 | `docs/evidence/stop-horizon-windows-2026-10-25/` | 实际测试日志、原始模型轨迹、失败学习材料、代数审查及源码校验 |
 
 ## 验证边界
