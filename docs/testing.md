@@ -40,6 +40,16 @@ python3 test/test_bridge_callbacks.py
 
 ## 2. 完整ROS构建与测试
 
+Windows开发机新增验证入口：
+
+```powershell
+python test/test_stop_hold_adapter.py --zig ../build-tools/ziglang/zig.exe
+python test/test_command_horizon.py -v
+python scripts/validate_command_horizon.py --output logs/horizon_01
+```
+
+第一条编译实际适配器，但ROS接口用桩：23场景76断言通过。第二条4项模型测试通过，第三条生成21组确定性时序案例；14项既有Python离线检查也通过。首次夹具失败与错误停发假设均保留为Debug材料。完整ROS编译、服务接线、Gazebo和实际停车仍未验证，不能与以上数量合并为“全部测试/真机通过”。详细证据见[本轮记录](evidence/stop-horizon-windows-2026-10-25/README.md)。
+
 Ubuntu18.04 / Melodic工作空间中：
 
 ```bash

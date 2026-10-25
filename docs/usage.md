@@ -68,6 +68,8 @@ rostopic hz /elfin_arm_controller/state
 
 站点提供std_srvs/Trigger停止保持服务，默认/elfin5_site/stop_hold。必须先独立验证正常运动、反馈失效与驱动异常下的停止/保持行为；空服务、固定OK、单纯类型重映射不能满足契约。详见[接口](interfaces.md)。
 
+当前开发环境是Windows，可先按[stop适配器](stop_adapter.md)运行不连接设备的离线测试。可选适配器有单独launch，真机主入口不会自动启动；本轮没有执行该ROS launch。不能仅以服务存在或桩测试通过设置现场审查标志。时域模型入口及未执行的ROS验证见[时域说明](horizon_validation.md)。
+
 ## 观察与影子计算
 
 复制站点配置：

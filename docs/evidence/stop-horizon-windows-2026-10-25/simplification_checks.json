@@ -1,0 +1,65 @@
+{
+  "lazy_gradient_finite_algebra": [
+    {
+      "sigma": 0.0,
+      "same_weighted_gradient": true
+    },
+    {
+      "sigma": 0.015,
+      "same_weighted_gradient": true
+    },
+    {
+      "sigma": 0.02,
+      "same_weighted_gradient": true
+    },
+    {
+      "sigma": 0.05,
+      "same_weighted_gradient": true
+    },
+    {
+      "sigma": 0.079,
+      "same_weighted_gradient": true
+    },
+    {
+      "sigma": 0.08,
+      "same_weighted_gradient": true
+    },
+    {
+      "sigma": 0.1,
+      "same_weighted_gradient": true
+    }
+  ],
+  "centering_counterexample_delta_xyz": [
+    9.99900009998958e-06,
+    -1.9992003198720515e-05,
+    0.00019801980198019803
+  ],
+  "centering_counterexample_norm": 0.00019927745023251897,
+  "endpoint_checks_counterexample": {
+    "start_desired": 0.9995,
+    "measured_position": 0.9925,
+    "endpoint": 0.9995,
+    "velocity_start_end": 0.05,
+    "horizon_s": 0.14,
+    "position_upper": 1.0,
+    "endpoint_step_limit": 0.02,
+    "peak_position": 1.0001735751836736,
+    "peak_fd_acceleration_rad_s2": 2.14132653061222,
+    "note": "代数反例，不是实际机械臂或QP闭环试验"
+  },
+  "one_shot_hold_watchdog": {
+    "timeout_s": 0.15,
+    "silence_s": 0.16,
+    "would_timeout": true,
+    "note": "源码条件核对；未运行ROS集成"
+  },
+  "preserved_files": {
+    "config/elfin5_qp_controller.yaml": "b3e12b2b8cff1813f136fbe35d68779409ca3c690e31c4d3e393d62072f5711c",
+    "config/elfin5_real_robot.yaml": "4d0449fc07e2e8a78229a88ce79d87e70a725750dc90dca53ec7acb88ee10450",
+    "src_gazebo/box_qp_solver.cpp": "50184dfc22ab9f0e3b36ba3deedb82efb3c04ac7384bb46c492da2a9513f0a57",
+    "src_gazebo/qp_cartesian_controller.cpp": "6ba8dfd0d24a36bc0007ac84694d4e288f7a67b8a4a2a9741ef7e31296eb9200",
+    "src/real_robot_bridge_node.cpp": "1187fcdc4aaa40147a0cb5610529c031e44d4823f0d07786a148698099b0e2be",
+    "src/real_robot_command_gate.cpp": "516ef6d9a549e585ecb4bd5185ae6ad379609bc3a57c017e8349e806a6f41500"
+  },
+  "limits": "只做代数与源码核对，没有实施控制器或网关简化。"
+}

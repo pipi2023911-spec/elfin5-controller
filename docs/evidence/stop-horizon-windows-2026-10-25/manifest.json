@@ -1,0 +1,86 @@
+{
+  "archive_sha256": "1c3dccd07ed587ff26842fa4ef0841a44a118647e640ac34fcbe4192752dad52",
+  "archive_bytes": 430835,
+  "members": {
+    "horizon/comparison.csv": {
+      "sha256": "782346f62ec52a6d3bc53da050808dfa394580ef86666d3742968bf8ec4ea399",
+      "bytes": 2855
+    },
+    "horizon/cutoff_h140.csv": {
+      "sha256": "3c30def357298b28e109de995cb281307e9d4bfe9e631399856c6b01ac3fe7b6",
+      "bytes": 249523
+    },
+    "horizon/cutoff_h50.csv": {
+      "sha256": "8cfffeb92a0d02eae7b0d9beb224fe118af2465b84bb2dbaae2e514abddb64a5",
+      "bytes": 199203
+    },
+    "horizon/horizon_comparison.png": {
+      "sha256": "a26ee4bd8a94bd4a5c2b2b4ed2731512543c42bdf7fa2214b58a393b0ebede14",
+      "bytes": 126399
+    },
+    "horizon/summary.json": {
+      "sha256": "2960279d3fbbe20c23953e8d2baa3a1147d7c340b69af48e95471f93aa192d31",
+      "bytes": 13271
+    },
+    "horizon/timer_horizon.csv": {
+      "sha256": "6b61d3558cf69c3ae77b5d187697ef05e8483c81e79120fb1a84aa96ce5d4f1d",
+      "bytes": 114
+    },
+    "horizon/trace_h140.csv": {
+      "sha256": "bf0622caacf2ebd1abeabf9a98045aa492af02c07d589abbceec92294dc0636a",
+      "bytes": 278138
+    },
+    "horizon/trace_h50.csv": {
+      "sha256": "aac790274070e65554fa62d556cd77edf61aa627487ed37b99d5a6e035b4ca3c",
+      "bytes": 208482
+    },
+    "horizon/trace_stall200.csv": {
+      "sha256": "b35fb45943cd2e3201e2713a78d1dd4d94cb7fe84dbc2fba7cd90b3274db02a8",
+      "bytes": 222987
+    },
+    "logs/elfin_stop_adapter_windows_2026-10-25.log": {
+      "sha256": "f1ef50ce2045fbec48bdea45c006ddc542811a038b0c6e223d6dec76e6cea9ab",
+      "bytes": 856
+    },
+    "logs/elfin_stop_adapter_windows_v2_2026-10-25.log": {
+      "sha256": "6ab2cdde5f69dccfa906ddec8854f4c8a4dce76e39fb6ec3048606d1f504d4aa",
+      "bytes": 1206
+    },
+    "logs/elfin_stop_adapter_windows_final_2026-10-25.log": {
+      "sha256": "4d026cf8e2f6f66c43318a73f7fd813cac043f6e6c78a4ea9ad30efa3fbffd44",
+      "bytes": 1272
+    },
+    "logs/elfin_horizon_tests_2026-10-25.log": {
+      "sha256": "da252fd52f5d7347182b51a7b9cdb3cf3d5a397a1f1c2a87638c14421d40ab27",
+      "bytes": 1345
+    },
+    "logs/elfin_horizon_tests_final_2026-10-25.log": {
+      "sha256": "479de72971d2dca88e6deee1827fd8d59d1e2e30be7b920be515c9c8a07ce1ed",
+      "bytes": 673
+    },
+    "logs/elfin_horizon_study_2026-10-25.log": {
+      "sha256": "b389fba9e57f1d1ada69ea7e6459c9780dd26a6dea087f0ac5c334ca5d6336c4",
+      "bytes": 103
+    },
+    "logs/elfin_stop_existing_offline_2026-10-25.log": {
+      "sha256": "20a53acd31270ff088ad6efd03abdbab9fc874ac0a6111ec621f832c64fcbafb",
+      "bytes": 1516
+    },
+    "review/check_elfin_simplifications.py": {
+      "sha256": "ab3334f4400dd0630cf4c83b0b5f238af020a88ceee85f37ffaa886069d391e9",
+      "bytes": 3761
+    },
+    "review/simplification_checks.json": {
+      "sha256": "053ccb3bd516f6dbd1a591182f90eb5e2272c349d6011d66c9e26d479034a505",
+      "bytes": 2117
+    },
+    "review/previous_review_checks.json": {
+      "sha256": "7a7e786be869836bb2b87bf72a6c1726191ee402fd0b64d4a6be6e7da6f4dabf",
+      "bytes": 4963
+    },
+    "package_elfin_stop_horizon.py": {
+      "sha256": "e430046fe002b356d9d0fa83e3c628caffa7e448cf19260cf610af63b12935fc",
+      "bytes": 4661
+    }
+  }
+}

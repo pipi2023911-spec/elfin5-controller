@@ -1,0 +1,17 @@
+<!-- 独立启动：不由真机入口自动包含，需先隔离测试并完成现场停止链核验。 -->
+<launch>
+  <arg name="command_topic" default="/elfin_arm_controller/command"/>
+  <arg name="joint_states_topic" default="/joint_states"/>
+  <arg name="controller_state_topic" default="/elfin_arm_controller/state"/>
+  <arg name="stop_service" default="/elfin5_site/stop_hold"/>
+  <node pkg="elfin5_qp_controller" type="stop_hold_adapter_node" name="elfin5_stop_hold_adapter" output="screen">
+    <param name="command_topic" value="$(arg command_topic)"/>
+    <param name="joint_states_topic" value="$(arg joint_states_topic)"/>
+    <param name="controller_state_topic" value="$(arg controller_state_topic)"/>
+    <param name="stop_service" value="$(arg stop_service)"/>
+    <param name="still_velocity" value="0.005"/>
+    <param name="confirm_duration" value="0.2"/>
+    <param name="confirm_timeout" value="1.0"/>
+    <param name="feedback_timeout" value="0.3"/>
+  </node>
+</launch>

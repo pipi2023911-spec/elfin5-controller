@@ -64,7 +64,7 @@ Bool只有本机单调接收时间。关节/JTC同时检查源时间与单调接
 | `/elfin5_real/bridge/enable` | std_srvs/SetBool | true人工放行；false关闭、请求保持/停止并锁存；停止失败后再次false明确重试一次 |
 | `/elfin5_real/bridge/reset` | std_srvs/Trigger | 停止请求成功应答后，操作员确认停稳再清锁存；不恢复运动 |
 | `/controller_manager/list_controllers` | controller_manager_msgs/ListControllers | 人工放行时查询执行控制器 |
-| `/elfin5_site/stop_hold` | std_srvs/Trigger | 由站点提供，经验证的停止当前运动并保持；本包只有客户端 |
+| `/elfin5_site/stop_hold` | std_srvs/Trigger | 站点停止保持接口；本包有客户端及可选适配器，后者仅完成Windows接口桩验证 |
 
 服务通信成功不等于业务成功，应检查 `success` 和中文 `message`。enable(false)成功表示网关处理了关闭请求，不表示已物理停稳。
 
@@ -87,6 +87,8 @@ Bool只有本机单调接收时间。关节/JTC同时检查源时间与单调接
 任何触发都不能凭网关消息保证停稳。反馈超时或驱动故障时，旧位置可能不可达或引起回退，此时由经过验证的执行层停止保持路径处理。不存在“不依赖反馈和驱动状态也能保证旧姿态静止”的软件承诺。
 
 ### 站点stop_hold契约
+
+本包提供独立可选实现，接口、参数和失败路径见[stop适配器](stop_adapter.md)。默认不随真机主入口启动，启动不发布命令。响应成功只确认请求后的实际六轴与JTC期望速度持续低于阈值，不是原生接收ACK或安全急停证明；必须完成后续ROS/Gazebo及现场停止链核验。
 
 实现应停止/替换当前运动，使用可靠执行层信息实现受控保持，避免继续执行旧候选；失败明确回复false。必须核实它对正常运动、反馈中断、总线异常和驱动故障的实际行为，记录响应和关节速度。它不能是空服务、固定成功回执，不能直接把Trigger重映射到SetBool。
 

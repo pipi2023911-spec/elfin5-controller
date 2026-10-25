@@ -76,6 +76,9 @@ add_library(elfin5_real_command_gate src/real_robot_command_gate.cpp)
 add_executable(real_robot_bridge_node src/real_robot_bridge_node.cpp)
 target_link_libraries(real_robot_bridge_node elfin5_real_command_gate ${catkin_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
 add_executable(real_robot_monitor_node src/real_robot_monitor_node.cpp)
+add_executable(stop_hold_adapter_node src/stop_hold_adapter_node.cpp)
+target_link_libraries(stop_hold_adapter_node ${catkin_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
+add_dependencies(stop_hold_adapter_node ${catkin_EXPORTED_TARGETS})
 target_link_libraries(real_robot_monitor_node elfin5_real_command_gate ${catkin_LIBRARIES})
 # 确保ROS生成消息/服务目标先完成，再编译硬件节点。
 add_dependencies(real_robot_bridge_node ${catkin_EXPORTED_TARGETS})
@@ -85,6 +88,7 @@ install(TARGETS
   elfin5_real_command_gate
   real_robot_bridge_node
   real_robot_monitor_node
+  stop_hold_adapter_node
   elfin5_box_qp_solver
   elfin5_qp_cartesian_controller
   elfin5_qp_controller_node
@@ -123,6 +127,10 @@ if(CATKIN_ENABLE_TESTING)
     add_test(NAME box_qp_file_contract COMMAND ${QP_TEST_PYTHON3}
       ${CMAKE_CURRENT_SOURCE_DIR}/test/test_qp_input_files.py
       $<TARGET_FILE:test_box_qp_standalone>)
+    add_test(NAME stop_adapter_offline COMMAND ${QP_TEST_PYTHON3}
+      ${CMAKE_CURRENT_SOURCE_DIR}/test/test_stop_hold_adapter.py)
+    add_test(NAME command_horizon_offline COMMAND ${QP_TEST_PYTHON3}
+      ${CMAKE_CURRENT_SOURCE_DIR}/test/test_command_horizon.py)
   endif()
   add_executable(test_gate_standalone test/test_gate_standalone.cpp)
   target_link_libraries(test_gate_standalone elfin5_real_command_gate)

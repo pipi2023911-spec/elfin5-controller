@@ -1,0 +1,5 @@
+﻿dt_ms,factor,horizon_ms,within_proposed_200ms
+20,7,140,True
+25,7,175,True
+30,7,210,False
+200,7,1400,False

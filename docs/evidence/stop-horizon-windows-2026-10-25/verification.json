@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-25",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.12.14",
+  "rospy_available_in_test_python": false,
+  "parent_commit": "c79b5f66f0c8b096a8aeb953d95ed6d5e7c13285",
+  "source_sha256": {
+    "src/stop_hold_adapter_node.cpp": "bfabafb0211ad0b4bf1e6fad1f132142ae92856e1f063d8c46b701f4a73b0edd",
+    "test/test_stop_hold_adapter.py": "c79fd359964d469edff8e30523bb6dc2be57c3bec5fe8babcc0e1fc21a8c7f55",
+    "scripts/validate_command_horizon.py": "0036283a51b9872061f0229d4cf8aa14a0871f96e26c8819f593ef0374977a37",
+    "test/test_command_horizon.py": "10eb6cb941449b39b108db12353d269615e0d67631c6224eced3975546f15fbe",
+    "launch/elfin5_stop_hold_adapter.launch": "e4b04d34b4183bb421d9d231d607f9a9b95771cb24447683119a78ef3dba56c6",
+    "CMakeLists.txt": "45c1fcb14580727bdd6dd1a0d6a8a0499458909622361c228ae59d9a7d0fffe5"
+  },
+  "preserved_production_files_sha256": {
+    "config/elfin5_qp_controller.yaml": "b3e12b2b8cff1813f136fbe35d68779409ca3c690e31c4d3e393d62072f5711c",
+    "config/elfin5_real_robot.yaml": "4d0449fc07e2e8a78229a88ce79d87e70a725750dc90dca53ec7acb88ee10450",
+    "src_gazebo/box_qp_solver.cpp": "50184dfc22ab9f0e3b36ba3deedb82efb3c04ac7384bb46c492da2a9513f0a57",
+    "src_gazebo/qp_cartesian_controller.cpp": "6ba8dfd0d24a36bc0007ac84694d4e288f7a67b8a4a2a9741ef7e31296eb9200",
+    "src/real_robot_bridge_node.cpp": "1187fcdc4aaa40147a0cb5610529c031e44d4823f0d07786a148698099b0e2be",
+    "src/real_robot_command_gate.cpp": "516ef6d9a549e585ecb4bd5185ae6ad379609bc3a57c017e8349e806a6f41500"
+  },
+  "stop": {
+    "scenarios": 23,
+    "assertions": 76,
+    "compiler": "Windows现有Zig C++14；ROS接口桩",
+    "production_parameters": {
+      "still_velocity_rad_s": 0.005,
+      "confirm_duration_s": 0.2,
+      "confirm_timeout_s": 1.0,
+      "feedback_timeout_s": 0.3
+    },
+    "first_fixture_failure_preserved": true
+  },
+  "horizon": {
+    "model_unit_tests": 4,
+    "model_cases": 21,
+    "production_config_changed": false,
+    "initial_incorrect_positive_stop_distance_assertion_preserved": true
+  },
+  "existing_offline_python_tests": 14,
+  "simplifications": "仅代数/源码审查，没有实施梯度、单次保持、居中或网关保护变更",
+  "not_run": [
+    "完整ROS构建/接线",
+    "Gazebo",
+    "厂家驱动",
+    "EtherCAT通信",
+    "真实停车/使能"
+  ],
+  "note": "原5mm容差、关节限制、QP求解器和100步预算保持不变；未向GitHub推送。"
+}
