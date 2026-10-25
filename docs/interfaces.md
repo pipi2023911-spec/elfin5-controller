@@ -37,18 +37,6 @@ QP的base/target需要持续更新且坐标系正确；不能只改frame_id冒�
 
 求解器参数和QPSolution结构不变。iterations为所有盒子问题累计的有效集步骤，受qp_max_iterations总预算限制；不是耗时。qp_projected_gradient_norm兼容键现在对应归一化KKT残差，定义见[QP算法](qp_solver.md)，不得与旧投影残差直接比较。可行但未满足KKT容差仍为QP_DEGRADED。中文原因区分数学不可行、预算不足和数值失败；上层已有QP_INFEASIBLE是通用失败状态，不证明所有失败都属于数学不可行。
 
-## QP关节限值参数
-
-| 参数 | 单位与生效方式 |
-|---|---|
-| joint_position_lower_limits / joint_position_upper_limits | rad，成对数组，与MoveIt模型位置边界取交集 |
-| joint_velocity_limits | rad/s，与模型速度取最小值，不扩大旧模型 |
-| joint_acceleration_limits | rad/s²，软件工程初值，基础六轴1.0，不是厂家额定值 |
-| position_limit_margin | rad，在交集上另外向内收紧；基础为0，手册10%已写入数组 |
-| velocity_limit_scale / acceleration_limit_scale | 对交集速度/软件加速度额外缩放；基础均为1.0 |
-
-数组按规划组J1至J6排列，启动日志输出实际生效值。配置位置/速度已扣10%，不重复乘0.9。真机候选额外采用0.05速度和0.25加速度缩放，不改变网关人工放行与独立站点限制。离散命令、插值与实际加速度的区别见[限值说明](joint_limits.md)。
-
 ## 网关输入输出
 
 | 默认话题 | 类型 | 用途 |

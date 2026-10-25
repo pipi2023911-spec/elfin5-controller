@@ -40,14 +40,6 @@ python3 test/test_bridge_callbacks.py
 
 ## 2. 完整ROS构建与测试
 
-关节参数变更还应运行：
-
-```bash
-python3 test/test_controller_limits.py --eigen /usr/include/eigen3
-```
-
-该脚本核对手册90%换算，并编译生产源码中实际的限值合并片段及`buildVelocityBounds`方法，参数读取/日志使用桩；64项C++断言通过。覆盖旧模型不被放宽、20 ms命令变化量、候选0.25加速度、非法参数和位置/加速度无交集。另有14项既有Python离线检查通过。它不编译完整ROS控制器，也不测JTC插值或真机。首次旧Eigen/Clang兼容失败日志保留，见[限值记录](evidence/joint-limits-2026-10-25/README.md)。
-
 Ubuntu18.04 / Melodic工作空间中：
 
 ```bash

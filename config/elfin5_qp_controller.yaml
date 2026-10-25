@@ -20,18 +20,13 @@ command_horizon_factor: 2.5
 qp_max_iterations: 100
 qp_tolerance: 1.0e-7
 
-# 数组顺序为 [elfin_joint1, ..., elfin_joint6]。按用户提供的手册截图，
-# 位置/速度已保留10%余量；配置与当前MoveIt模型取更严交集，不扩大旧URDF。
-# 位置：±[324,121.5,137.7,324,162,324]度。
-joint_position_lower_limits: [-5.654866776461628, -2.1205750411731104, -2.403318379996192, -5.654866776461628, -2.827433388230814, -5.654866776461628]
-joint_position_upper_limits: [5.654866776461628, 2.1205750411731104, 2.403318379996192, 5.654866776461628, 2.827433388230814, 5.654866776461628]
-# 速度：[162,162,162,162,180,180]度/秒；不再重复乘0.9。
-joint_velocity_limits: [2.827433388230814, 2.827433388230814, 2.827433388230814, 2.827433388230814, 3.141592653589793, 3.141592653589793]
-# 手册未给加速度额定值；1 rad/s²仅是待验证的软件初值，不是厂家保证。
-joint_acceleration_limits: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-position_limit_margin: 0.0
-velocity_limit_scale: 1.0
-acceleration_limit_scale: 1.0
+# 关节位置边界从 robot_description 读取。以下数组顺序为
+# [elfin_joint1, ..., elfin_joint6]，数值与 Elfin5 MoveIt 配置保持一致。
+joint_velocity_limits: [1.57, 1.57, 1.57, 1.57, 1.57, 1.57]
+joint_acceleration_limits: [12.56, 12.56, 12.56, 12.56, 12.56, 12.56]
+position_limit_margin: 0.03
+velocity_limit_scale: 0.70
+acceleration_limit_scale: 0.70
 
 # 针对 3x6 平移雅可比的奇异性检测与规避参数。
 nominal_damping: 0.0001

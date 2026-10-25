@@ -26,7 +26,6 @@ ROS1 机械臂实验包：通过 QP 计算六轴关节速度，跟踪末端 XYZ 
 - [接口说明](docs/interfaces.md)：话题、服务、参数、坐标、时间与故障行为。
 - [测试说明](docs/testing.md)：独立 C++、Python 离线、ROS 隔离、Gazebo 和现场验收。
 - [QP算法与验收](docs/qp_solver.md)：有效集、半空间乘子搜索、残差定义与数值回归。
-- [关节限值与加速度](docs/joint_limits.md)：手册10%余量、与旧模型取交集、软件加速度初值和验证边界。
 
 ```bash
 cd ~/catkin_ws
@@ -58,7 +57,7 @@ Gazebo 启动后还需提供基座位姿、目标并显式启用 QP；完整步�
 | `launch/elfin5_qp_controller.launch` | 单独加载 QP，依赖外部模型和执行环境 |
 | `launch/elfin5_qp_gazebo.launch` | 厂家 Gazebo、MoveIt 与 QP 入口，不加载真机网关 |
 | `launch/elfin5_qp_real_robot.launch` | 真机候选 QP、网关、监视器与可选 RViz |
-| `config/elfin5_qp_controller.yaml` | QP参数、手册90%位置/速度、软件加速度和奇异阈值 |
+| `config/elfin5_qp_controller.yaml` | QP参数、控制频率、关节约束和奇异阈值 |
 | `config/elfin5_real_robot.yaml` | 真机限值、厂家状态/停止接口、监视与低速候选参数 |
 | `config/elfin5_real_robot.rviz` | absolute_world 下的模型、TF、轨迹和目标显示 |
 | `config/qp_test_suite.yaml` | Gazebo轮次、初始姿态、目标和判定阈值 |
@@ -71,7 +70,6 @@ Gazebo 启动后还需提供基座位姿、目标并显式启用 QP；完整步�
 | `test/qp_reference_cases.txt` | 固定2000组六维可行合成QP与参考目标值 |
 | `test/qp_reference_cases.meta.json` | 固定参考集来源、数量、分组、SHA256及证据边界 |
 | `test/test_qp_input_files.py` | 开发机Python3验证缺失、空、截断、非有限和数量不符文件必须失败 |
-| `test/test_controller_limits.py` | 手册参数换算、实际C++限值合并和加速度窗口测试，ROS参数使用桩 |
 | `test/test_real_robot_command_gate.cpp` | GoogleTest命令检查与名称/时间规则测试 |
 | `test/test_gate_standalone.cpp` | 不依赖ROS/Eigen/GoogleTest的命令与保持核心回归 |
 | `test/test_bridge_callbacks.py` | Python3开发机编译实际网关方法，使用ROS桩验证放行/故障/保持；不代替ROS集成 |
@@ -82,9 +80,6 @@ Gazebo 启动后还需提供基座位姿、目标并显式启用 QP；完整步�
 | `docs/usage.md` | 编译、仿真、影子、现场操作和记录 |
 | `docs/testing.md` | 测试层级、命令、判定与未验证边界 |
 | `docs/qp_solver.md` | QP数学问题、算法、总预算、残差及复现说明 |
-| `docs/joint_limits.md` | 关节限值来源、10%余量、模型差异和加速度初值 |
-| `docs/elfin_joint_limits_reference.png` | 用户提供的位置/速度手册截图，未包含额定加速度 |
-| `docs/evidence/joint-limits-2026-10-25/` | 参数、只读模型核对、源码摘要、失败和通过日志及测试结果 |
 
 ## 验证边界
 
@@ -95,5 +90,3 @@ QP采用盒有效集和带区间保护的半空间乘子搜索，求解接口保
 `success`仅表示容差内可行，`converged`还须通过KKT检查。兼容字段`projected_gradient_norm`现在表示归一化KKT残差，不与旧投影梯度残差混比。合成测试比例不是现场故障率，开发机计时不是硬实时上限。完整ROS构建、Gazebo R1–R9与真机需分别验收；准确求解后关节居中及奇异区行为可能变化。
 
 默认真机配置限值为空、现场审查关闭。站点 `stop_hold` 服务不由本包伪造；必须接入并验证真实停止保持动作。厂家 `disable_robot` 和 `stop_teleop` 不能直接冒充相同契约。总线中断时仍需已验证的执行层看门狗和现场独立停止设施。
-
-位置/速度参数按用户手册保留10%余量，并与当前MoveIt模型取更严交集；基础软件加速度为1.0 rad/s²，真机候选为0.25 rad/s²，均非厂家额定值。限值变更已通过64项实际C++片段/方法断言和14项既有离线Python测试，完整ROS构建与Gazebo仍未运行。来源、实际边界和失败日志见[限值说明](docs/joint_limits.md)。

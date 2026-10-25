@@ -52,7 +52,5 @@ qp_candidate:
   absolute_frame: absolute_world
   maximum_cartesian_speed: 0.01
   velocity_limit_scale: 0.05
-  # 基础加速度改为1 rad/s²；候选采用0.25 rad/s²，接近原0.2512初值。
-  # 这不是厂家额定值或已验证的真机安全加速度，网关仍默认关闭。
-  acceleration_limit_scale: 0.25
+  acceleration_limit_scale: 0.02
   input_timeout: 0.3

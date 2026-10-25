@@ -26,7 +26,7 @@ namespace
 {
 
 constexpr double kDefaultVelocityLimit = 1.57;
-constexpr double kDefaultAccelerationLimit = 1.0;  // 软件初值；手册没有提供加速度额定值。
+constexpr double kDefaultAccelerationLimit = 12.56;
 constexpr double kSmallNumber = 1e-9;
 
 double clampValue(const double value, const double lower, const double upper)
@@ -240,7 +240,7 @@ bool QPCartesianController::loadRobotModel()
 
   for (Eigen::Index index = 0; index < count; ++index)
   {
-    // 先读取模型边界，后续配置只能收紧，不能扩大厂家URDF/MoveIt限制。
+    // 位置和速度优先采用模型数据；缺失时才使用 Elfin5 的保守默认值。
     const moveit::core::VariableBounds& bounds =
         robot_model_->getVariableBounds(joint_names_[static_cast<std::size_t>(index)]);
 
@@ -255,69 +255,20 @@ bool QPCartesianController::loadRobotModel()
     maximum_accelerations_[index] = kDefaultAccelerationLimit;
   }
 
-  std::vector<double> configured_position_lower_limits;
-  std::vector<double> configured_position_upper_limits;
-  const bool has_lower = private_node_handle_.getParam(
-      "joint_position_lower_limits", configured_position_lower_limits);
-  const bool has_upper = private_node_handle_.getParam(
-      "joint_position_upper_limits", configured_position_upper_limits);
-  if (has_lower != has_upper || (has_lower &&
-      (configured_position_lower_limits.size() != joint_names_.size() ||
-       configured_position_upper_limits.size() != joint_names_.size())))
-  {
-    ROS_ERROR("关节位置上下限必须成对提供，并与规划组关节数量一致");
-    return false;
-  }
-  if (has_lower)
-  {
-    for (Eigen::Index index = 0; index < count; ++index)
-    {
-      const double lower = configured_position_lower_limits[static_cast<std::size_t>(index)];
-      const double upper = configured_position_upper_limits[static_cast<std::size_t>(index)];
-      if (!std::isfinite(lower) || !std::isfinite(upper) || lower >= upper)
-      {
-        ROS_ERROR("配置的关节位置上下限必须有限且下限小于上限");
-        return false;
-      }
-      minimum_positions_[index] = std::max(minimum_positions_[index], lower);
-      maximum_positions_[index] = std::min(maximum_positions_[index], upper);
-    }
-  }
-  if ((minimum_positions_.array() + position_limit_margin_ >=
-       maximum_positions_.array() - position_limit_margin_).any())
-  {
-    ROS_ERROR("模型与配置的位置边界没有有效交集，或位置余量过大");
-    return false;
-  }
-
   std::vector<double> configured_velocity_limits;
-  if (private_node_handle_.getParam("joint_velocity_limits", configured_velocity_limits))
+  if (private_node_handle_.getParam("joint_velocity_limits", configured_velocity_limits) &&
+      configured_velocity_limits.size() == joint_names_.size())
   {
-    if (configured_velocity_limits.size() != joint_names_.size())
-    {
-      ROS_ERROR("关节速度限值数量必须与规划组一致");
-      return false;
-    }
     for (Eigen::Index index = 0; index < count; ++index)
     {
-      const double value = configured_velocity_limits[static_cast<std::size_t>(index)];
-      if (!std::isfinite(value) || value <= 0.0)
-      {
-        ROS_ERROR("配置的关节速度限值必须为有限正数");
-        return false;
-      }
-      maximum_velocities_[index] = std::min(maximum_velocities_[index], value);
+      maximum_velocities_[index] = configured_velocity_limits[static_cast<std::size_t>(index)];
     }
   }
 
   std::vector<double> configured_acceleration_limits;
-  if (private_node_handle_.getParam("joint_acceleration_limits", configured_acceleration_limits))
+  if (private_node_handle_.getParam("joint_acceleration_limits", configured_acceleration_limits) &&
+      configured_acceleration_limits.size() == joint_names_.size())
   {
-    if (configured_acceleration_limits.size() != joint_names_.size())
-    {
-      ROS_ERROR("关节加速度限值数量必须与规划组一致");
-      return false;
-    }
     for (Eigen::Index index = 0; index < count; ++index)
     {
       maximum_accelerations_[index] = configured_acceleration_limits[static_cast<std::size_t>(index)];
@@ -330,16 +281,6 @@ bool QPCartesianController::loadRobotModel()
   {
     ROS_ERROR("关节速度和加速度限值必须为有限正数");
     return false;
-  }
-
-  for (Eigen::Index index = 0; index < count; ++index)
-  {
-    ROS_INFO_STREAM("关节 " << joint_names_[static_cast<std::size_t>(index)]
-                    << " 有效位置=[" << minimum_positions_[index] + position_limit_margin_
-                    << ", " << maximum_positions_[index] - position_limit_margin_
-                    << "] rad，速度=" << velocity_limit_scale_ * maximum_velocities_[index]
-                    << " rad/s，加速度=" << acceleration_limit_scale_ * maximum_accelerations_[index]
-                    << " rad/s²（软件初值）");
   }
 
   robot_state_.reset(new moveit::core::RobotState(robot_model_));
