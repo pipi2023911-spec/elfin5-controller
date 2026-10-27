@@ -30,6 +30,7 @@ ROS1 机械臂实验包：通过 QP 计算六轴关节速度，跟踪末端 XYZ 
 - [QP算法与验收](docs/qp_solver.md)：有效集、半空间乘子搜索、残差定义与数值回归。
 - [stop适配器](docs/stop_adapter.md)：独立停止请求、请求后持续低速确认和Windows验证边界。
 - [时域与简化审查](docs/horizon_validation.md)：50/140 ms离线对照、回调延迟、停发代价及未实施项。
+- [轨迹覆盖缺口Debug记录](docs/debug/horizon-coverage-2026-10-27/README.md)：旧50ms基线、固定140ms适配、实际方法回归及未验证事项。
 - [Debug原因与决策记录](docs/debug_history.md)：历轮修改依据、失败、撤回和暂不应用的原因。
 
 ```bash
@@ -83,6 +84,7 @@ Gazebo 启动后还需提供基座位姿、目标并显式启用 QP；完整步�
 | `test/test_bridge_callbacks.py` | Python3开发机编译实际网关方法，使用ROS桩验证放行/故障/保持；不代替ROS集成 |
 | `test/test_stop_hold_adapter.py` | Windows/Linux编译实际适配器，使用ROS接口桩验证23场景76断言 |
 | `test/test_command_horizon.py` | 解析样条、候选命令限幅、采样时序与停发模型测试 |
+| `test/test_qp_command_horizon.py` | 编译实际QP参数检查、边界和发布方法，验证固定140ms与dt分离；ROS接口用桩 |
 | `test/test_real_robot_tf_and_error.py` | URDF夹具、误差函数与launch接线的离线检查 |
 | `test/test_real_robot_wiring.py` | 假反馈/假状态/假停止的ROS隔离夹具，禁止接真机master |
 | `test/test_real_robot_wiring.test` | 隔离网关、监视器与模型发布器的rostest入口 |
@@ -91,10 +93,11 @@ Gazebo 启动后还需提供基座位姿、目标并显式启用 QP；完整步�
 | `docs/testing.md` | 测试层级、命令、判定与未验证边界 |
 | `docs/qp_solver.md` | QP数学问题、算法、总预算、残差及复现说明 |
 | `docs/stop_adapter.md` | stop接口、持续确认、失败路径、Windows与现场验证边界 |
-| `docs/horizon_validation.md` | 离线模型、21组条件、简化审查与未改变的生产参数 |
+| `docs/horizon_validation.md` | 固定时域参数、离线模型、21组条件及简化审查 |
 | `docs/debug_history.md` | 修改原因、实际证据、采用/撤回/暂缓决策及学习要点 |
 | `docs/debug/README.md`、`manifest_2026-10-25.json`、`historical_evidence_2026-10-25.zip` | 历史提案完整快照和早期通过/失败记录，只供Debug，不是当前配置 |
 | `docs/evidence/stop-horizon-windows-2026-10-25/` | 实际测试日志、原始模型轨迹、失败学习材料、代数审查及源码校验 |
+| `docs/debug/horizon-coverage-2026-10-27/` | 覆盖缺口原因、旧源码ZIP/清单、140ms回归日志及模型对照；历史基线不可直接接真机 |
 
 ## 验证边界
 
@@ -106,4 +109,6 @@ QP采用盒有效集和带区间保护的半空间乘子搜索，求解接口保
 
 默认真机配置限值为空、现场审查关闭。站点 `stop_hold` 服务不由本包伪造；必须接入并验证真实停止保持动作。厂家 `disable_robot` 和 `stop_teleop` 不能直接冒充相同契约。总线中断时仍需已验证的执行层看门狗和现场独立停止设施。
 
-可选stop适配器已完成Windows接口桩验证（23场景76断言），以及21组单关节时域模型和4项模型测试、14项既有离线检查。生产时域仍为2.5倍控制dt，容差仍5 mm，QP/关节参数/现有网关检查未改变。140 ms只是后续隔离A/B候选；这些通过结果不能作为现场停车和真机放行证据。
+可选stop适配器已有Windows接口桩验证（23场景76断言）。QP控制器当前使用`command_horizon: 0.14`秒，普通运动与QP保持均为固定140ms，不再随控制周期缩放；原`command_horizon_factor`参数已移除。50Hz计算频率、5mm容差、数值求解器、100步预算、关节限制和网关检查保持不变。
+
+固定时域已通过144项实际C++方法/网关断言（ROS接口桩）、4项时域模型测试和14项既有离线检查，重跑21组单关节时序模型。标称100ms接收间隔下的模型覆盖缺口得到改善，200ms延迟及停发仍有边界问题；完整ROS构建、Gazebo和真机尚未验证，不能称为真机抖动已消除。旧版源码及失败条件见Debug记录，历史证据的SHA256对应当时版本。

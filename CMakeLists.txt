@@ -131,6 +131,8 @@ if(CATKIN_ENABLE_TESTING)
       ${CMAKE_CURRENT_SOURCE_DIR}/test/test_stop_hold_adapter.py)
     add_test(NAME command_horizon_offline COMMAND ${QP_TEST_PYTHON3}
       ${CMAKE_CURRENT_SOURCE_DIR}/test/test_command_horizon.py)
+    add_test(NAME qp_command_horizon_offline COMMAND ${QP_TEST_PYTHON3}
+      ${CMAKE_CURRENT_SOURCE_DIR}/test/test_qp_command_horizon.py --eigen ${EIGEN3_INCLUDE_DIRS})
   endif()
   add_executable(test_gate_standalone test/test_gate_standalone.cpp)
   target_link_libraries(test_gate_standalone elfin5_real_command_gate)

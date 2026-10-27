@@ -176,7 +176,7 @@ private:
   double joint_centering_gain_;
   double finite_difference_step_;
   double input_timeout_;
-  double command_horizon_factor_;
+  double command_horizon_;  // 固定轨迹覆盖时间(s)，不随控制周期dt缩放。
   int qp_max_iterations_;
   double qp_tolerance_;
 };

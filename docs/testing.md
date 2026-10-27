@@ -30,6 +30,14 @@ python test/test_real_robot_tf_and_error.py -v
 
 Python检查涵盖模型结构夹具、原样保留URDF、误差映射/符号/缺失段、launch候选隔离及直接输入接线。语法解析不能证明ROS依赖或节点行为。
 
+固定140ms的实际方法回归（C++14、Eigen、开发机Python3）：
+
+```bash
+python3 test/test_qp_command_horizon.py --eigen /usr/include/eigen3
+```
+
+Windows使用`--zig ../build-tools/ziglang/zig.exe --eigen ../eigen-compat/eigen-git-mirror-3.3.4`。144项断言覆盖参数读取/拒绝无效值、周期变化不缩放时域、端点/保持、位置边界用H而加速度边界用dt、现有网关时域/样例包络。测试编译实际方法片段和网关库，ROS发布接口是桩，不验证完整MoveIt/ROS节点。旧50ms覆盖缺口及模型失败条件见[Debug记录](debug/horizon-coverage-2026-10-27/README.md)。
+
 开发机有Python3及g++时还可执行：
 
 ```bash

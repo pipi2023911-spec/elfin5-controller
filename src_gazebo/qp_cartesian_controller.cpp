@@ -104,7 +104,7 @@ QPCartesianController::QPCartesianController(
   private_node_handle_.param("joint_centering_gain", joint_centering_gain_, 0.08);
   private_node_handle_.param("finite_difference_step", finite_difference_step_, 1e-4);
   private_node_handle_.param("input_timeout", input_timeout_, 1.0);
-  private_node_handle_.param("command_horizon_factor", command_horizon_factor_, 2.5);
+  private_node_handle_.param("command_horizon", command_horizon_, 0.14);
   private_node_handle_.param("qp_max_iterations", qp_max_iterations_, 100);
   private_node_handle_.param("qp_tolerance", qp_tolerance_, 1e-7);
 
@@ -125,7 +125,7 @@ QPCartesianController::QPCartesianController(
       !std::isfinite(joint_centering_gain_) || joint_centering_gain_ < 0.0 ||
       !std::isfinite(finite_difference_step_) || finite_difference_step_ <= 0.0 ||
       !std::isfinite(input_timeout_) || input_timeout_ <= 0.0 ||
-      !std::isfinite(command_horizon_factor_) || command_horizon_factor_ < 1.0 ||
+      !std::isfinite(command_horizon_) || command_horizon_ <= 0.0 ||
       qp_max_iterations_ <= 0 ||
       !std::isfinite(qp_tolerance_) || qp_tolerance_ <= 0.0)
   {
@@ -708,9 +708,8 @@ void QPCartesianController::publishTrajectoryCommand(
 
 void QPCartesianController::publishZeroVelocityHold(const Eigen::VectorXd& positions)
 {
-  const double dt = 1.0 / std::max(control_rate_, 1.0);
   publishTrajectoryCommand(positions, Eigen::VectorXd::Zero(positions.size()),
-                           command_horizon_factor_ * dt);
+                           command_horizon_);
   previous_velocity_command_.setZero();
 }
 
@@ -966,7 +965,8 @@ void QPCartesianController::controlTimerCallback(const ros::TimerEvent& event)
   {
     dt = 1.0 / std::max(control_rate_, 1.0);
   }
-  const double command_horizon = command_horizon_factor_ * dt;
+  // 时域覆盖厂家接收间隔；dt仍单独用于相邻QP速度变化约束。
+  const double command_horizon = command_horizon_;
 
   Eigen::Vector3d desired_cartesian_velocity = position_gain_ * position_error_vector;
   // 限制笛卡尔速度模长，避免远距离目标产生过大的瞬时速度请求。

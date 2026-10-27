@@ -4,6 +4,8 @@
 
 目标平台Ubuntu 18.04 / ROS Melodic / Python2.7。使用设备匹配的厂家elfin_robot包、MoveIt、Gazebo和Eigen。此包包名为elfin5_qp_controller，同一工作空间只保留一份。
 
+QP当前采用固定`command_horizon: 0.14`秒，50Hz求解频率不变；原倍率参数`command_horizon_factor`不再生效。更新后重启节点，Gazebo核对`/elfin5_qp_controller/command_horizon`，真机影子入口核对`/elfin5_real/qp_candidate/command_horizon`。旧站点副本删除倍率键，按需使用秒制参数；140ms未替代现场停止验证。详见[当前时域与Debug基线](horizon_validation.md)。
+
 ```bash
 source /opt/ros/melodic/setup.bash
 cd ~/catkin_ws

@@ -1,17 +1,24 @@
-# 时域调整与简化审查：Windows离线验证
+# 固定140ms轨迹时域与简化审查
 
 ## 范围
 
-按stop适配器 → 时域调整 → 简化审查的顺序进行。本轮生产`command_horizon_factor`仍为2.5、`goal_tolerance`仍为0.005 m；关节限制、QP求解器及100步预算、现有网关检查均未改动。140 ms仅作为离线实验输入，没有写入真机或Gazebo配置。
+当前QP配置为`command_horizon: 0.14`，单位秒；普通运动和QP零端点速度保持共用固定140ms。Gazebo/真机候选入口均加载该配置；真机站点副本不覆盖此值时继承140ms。参数启动读取，不热更新。
+
+50Hz控制周期仍用于相邻QP速度变化约束；端点预测、位置边界和`time_from_start`使用同一个固定H。dt为10/20/30/200ms时，H均为140ms；控制回调本身的dt异常处理保持不变。网关max_horizon=150ms、hold_horizon=100ms、候选年龄/超时与停止适配器均未修改。网关独立故障保持不等于QP保持。
+
+旧`command_horizon_factor`已移除，不再作为配置接口。已有站点副本若含该键，应删除，改用秒制`command_horizon`，并核对`rosparam get /elfin5_real/qp_candidate/command_horizon`。不要只把旧倍率改成7。5mm容差、关节限制、数值求解器和100步预算保持不变。
+
+旧50ms版本、原因、源码及测试日志见[覆盖缺口Debug记录](debug/horizon-coverage-2026-10-27/README.md)。本次代码适配已完成，Windows实际方法桩回归通过；ROS/JTC接线、Gazebo及真机改善仍待验证。
 
 ## 模型和命令
 
 ```powershell
 python test/test_command_horizon.py -v
+python test/test_qp_command_horizon.py --zig ../build-tools/ziglang/zig.exe --eigen ../eigen-compat/eigen-git-mirror-3.3.4
 python scripts/validate_command_horizon.py --output logs/horizon_01
 ```
 
-脚本是开发机Python3工具，不是ROS控制节点；使用标准库生成数据、Matplotlib生成图。不覆盖已有目录。Windows已运行4项测试及21组时序案例。
+模型脚本是开发机Python3工具，不是ROS控制节点；使用标准库生成数据、Matplotlib生成图。不覆盖已有目录。Windows已运行4项模型测试及21组时序案例。新增方法测试需C++14编译器与Eigen；默认g++和/usr/include/eigen3，Windows示例使用既有Zig/旧Eigen。它提取并编译实际参数检查、发布/保持及速度边界方法，另链接实际网关纯检查实现，144项断言通过；没有编译整个MoveIt控制器节点。
 
 模型：单关节、理想跟踪、20 ms位置采样和命令周期、1 ms插值采样、P增益1.5、目标0.5 rad、速度0.0785 rad/s、命令差分加速度0.2512 rad/s²。最后两个值取当前真机候选参数的量级，并非硬件额定值。候选端点为`q_meas+h*dq`；下游标称每100 ms取最新一条，在下一更新时刻按剩余绝对时域接续三次Hermite曲线；过期整点丢弃，终点后保持位置且速度为零。
 
@@ -33,9 +40,9 @@ python scripts/validate_command_horizon.py --output logs/horizon_01
 
 完整轨迹还显示：140 ms名义工况的起步差分峰值约0.755984 rad/s²，高于命令差分限制；停发后，最后端点的非零速度被JTC模型截成零，整段差分峰值达到78.5 rad/s²。这是理想模型的1 ms差分，不能作为真实机械加速度。延长时域改善巡航，不替代受控减速停止。
 
-`factor=7`也不保证实际时域恒为140 ms：源码使用当次dt。dt为20/25/30 ms时，时域分别140/175/210 ms；210 ms已经超出拟议网关200 ms上限。标称100 ms不是回调最坏间隔，因此140 ms应作为后续隔离A/B候选，而非已完成的真机修复。
+历史倍率方案`factor=7`不能保证时域恒为140ms：dt为20/25/30ms时会分别产生140/175/210ms。当前已改用固定秒值，避免这类dt耦合；不需要为它放宽现有150ms网关时域上限。标称100ms不是回调最坏间隔，所以固定140ms也不是全工况不断轨或真机无抖动保证。
 
-输出`comparison.csv`、`timer_horizon.csv`、`summary.json`、两组名义轨迹、两组停发轨迹、200 ms延迟轨迹和曲线，均保留在[实测归档](evidence/stop-horizon-windows-2026-10-25/README.md)。
+输出`comparison.csv`、`timer_horizon.csv`、`summary.json`、两组名义轨迹、两组停发轨迹、200 ms延迟轨迹和曲线，均保留在[模型与Windows测试归档](evidence/stop-horizon-windows-2026-10-25/README.md)。
 
 ## 逐项简化审查
 
@@ -54,4 +61,4 @@ python scripts/validate_command_horizon.py --output logs/horizon_01
 
 ## 下一步
 
-在可用的ROS Melodic环境中先完整编译和隔离接线，再验证stop联动；之后单独对比50/140 ms，记录下游实际接收、JTC desired/actual、拒绝和停发结果。只有数据支持时才更改站点时域参数。Windows结果不替代这些步骤，也不触发真机放行。
+在可用的ROS Melodic环境中完整编译和隔离接线，验证stop联动；用保留的旧版基线与当前固定140ms版本分别记录下游实际接收、JTC desired/actual、拒绝和停发结果。普通Gazebo入口不自带厂家10Hz回调瓶颈，须明确是否复现该延迟。Windows结果不替代这些步骤，也不触发真机放行。

@@ -37,6 +37,8 @@ QP的base/target需要持续更新且坐标系正确；不能只改frame_id冒�
 
 求解器参数和QPSolution结构不变。iterations为所有盒子问题累计的有效集步骤，受qp_max_iterations总预算限制；不是耗时。qp_projected_gradient_norm兼容键现在对应归一化KKT残差，定义见[QP算法](qp_solver.md)，不得与旧投影残差直接比较。可行但未满足KKT容差仍为QP_DEGRADED。中文原因区分数学不可行、预算不足和数值失败；上层已有QP_INFEASIBLE是通用失败状态，不证明所有失败都属于数学不可行。
 
+QP的`command_horizon`单位为秒，当前默认0.14，启动时读取。普通运动与QP保持均用固定140ms；端点位置预测和位置约束使用该H，加速度盒约束仍用实际dt。原`command_horizon_factor`已移除，旧站点副本应迁移，不能再通过倍率配置时域。控制频率仍为50Hz；时域不是消息发送周期，也不是保证停车时间。详见[时域说明](horizon_validation.md)。
+
 ## 网关输入输出
 
 | 默认话题 | 类型 | 用途 |

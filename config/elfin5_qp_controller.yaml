@@ -13,7 +13,9 @@ control_rate: 50.0
 position_gain: 1.5
 maximum_cartesian_speed: 0.15
 goal_tolerance: 0.005
-command_horizon_factor: 2.5
+# 固定轨迹覆盖时间，单位s；与50Hz求解周期解耦，避免50ms端点先于下次厂家回调结束。
+# 普通运动与QP保持共用该值；实际接续、插值及停车仍需ROS/Gazebo/现场分别验证。
+command_horizon: 0.14
 
 # QP达到迭代上限但仍满足安全约束时，控制器进入QP_DEGRADED而不是直接停机。
 # 首轮实验先保留默认值，根据诊断中的迭代次数和残差决定是否调整。

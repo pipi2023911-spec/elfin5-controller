@@ -1,0 +1,126 @@
+{
+  "date": "2026-10-27",
+  "parent_commit": "5223f02b742a70caa0febe1bbaeb5ae2dc46ca90",
+  "current_source_sha256": {
+    "config/elfin5_qp_controller.yaml": "748a28b2371f9c5fe2a4b56813dc9b74e577a1cb7a008fab5ed45474794122f3",
+    "src_gazebo/qp_cartesian_controller.cpp": "6060606cb2c2aa2174c2746cc79816040a820e545b60dc51bfa0bf160bac9c80",
+    "include/elfin5_qp_controller/qp_cartesian_controller.h": "ef793b962816ce2935230cef26285fe637547ba4e96e764997af5d78f5835747",
+    "CMakeLists.txt": "03f1ec4a477e54c12f9928c5fd19fece9f8df8cbc9633805ccfb4e2829f14ee8",
+    "test/test_qp_command_horizon.py": "fd02263945d1fa3c753d5bf2087d5a2f382698cabb09a18fec63a98353665e33"
+  },
+  "unchanged_qp_files_sha256": {
+    "src_gazebo/box_qp_solver.cpp": "50184dfc22ab9f0e3b36ba3deedb82efb3c04ac7384bb46c492da2a9513f0a57",
+    "src/real_robot_command_gate.cpp": "516ef6d9a549e585ecb4bd5185ae6ad379609bc3a57c017e8349e806a6f41500",
+    "src/real_robot_bridge_node.cpp": "1187fcdc4aaa40147a0cb5610529c031e44d4823f0d07786a148698099b0e2be",
+    "src/stop_hold_adapter_node.cpp": "bfabafb0211ad0b4bf1e6fad1f132142ae92856e1f063d8c46b701f4a73b0edd",
+    "config/elfin5_real_robot.yaml": "4d0449fc07e2e8a78229a88ce79d87e70a725750dc90dca53ec7acb88ee10450"
+  },
+  "unchanged_vendor_files_sha256": {
+    "elfin_ethercat_driver/src/elfin_ethercat_manager.cpp": "1bc0e3e001ba33fbcd26a8cb48205b2fe32a697f168e4737e1ceec66a09226a1",
+    "elfin_ethercat_driver/src/elfin_ethercat_client.cpp": "f6dc441041b5cbb80a8143341a78d52d7eb77a23d1d0f58e8ad784ac4acd229c",
+    "elfin_ros_control/src/elfin_hardware_interface.cpp": "8140e949bbf2c9c8ad0627339cffde4c18ae1bfd88fdc3b071191db6ffcd7a7b",
+    "elfin_ethercat_driver/src/elfin_ethercat_driver.cpp": "cc1f166c6b5a631e228d2efc8c87443a866a59261c336dc9d2bdb48d06b3916e",
+    "elfin_basic_api/src/elfin_basic_api.cpp": "8d502f153657dec3eae594c9648bf7543d4d2a6493ef8c173142814600bde821",
+    "elfin_basic_api/src/elfin_basic_api_node.cpp": "501f3ecad601ac26dd8dbad3affaeda4bbc5a10c3e5b646b2811374802fe7e11",
+    "elfin_basic_api/src/elfin_teleop_api.cpp": "9e4a0ebb5cc5a8c996e2c492ee37a971c36882605be5be9cf7d5964bd1e61b5a",
+    "elfin_basic_api/src/elfin_motion_api.cpp": "20b9315fd586d8914345824d5cb239370a72475c9013a0b3062981ccd0dce524",
+    "elfin_robot_bringup/config/elfin_arm_control.yaml": "fe177e5459519733204007c52844ea4d7d28fceb5d5091959a8c092d76daaabe",
+    "elfin_robot_bringup/config/joint_state_controller.yaml": "66bceccbf437924000a0bffad15a3eee6749cd12ea5dcd9dd317a67f297ac6e9",
+    "elfin_robot_bringup/config/elfin_drivers.yaml": "285d575b49f0672bcb1efd73b1f9b295f7859b5c98cb2ba1a719ef45404ea568",
+    "elfin_robot_bringup/launch/elfin_ros_control.launch": "162222ca606580206dfcfbb7c5a564c3d110ec4e985a7d8e91b42451aee661d1",
+    "elfin5_moveit_config/config/controllers.yaml": "ec2ba5da6ef330464bf974cd7d2b61230e361794b939f222dfece38f1e8812b7",
+    "elfin_description/urdf/elfin_robot.gazebo": "26b525ed7cfeea8207e6276b3328f2def9e343f7f6ae441ea398840a00b2f521",
+    "elfin_gazebo/launch/elfin5_empty_world.launch": "60f2cf51d77e957b55b7a78836cce57dd1141b9788e54d3cb12f515e473c478f"
+  },
+  "cpp_method_assertions": 144,
+  "horizon_model_tests": 4,
+  "existing_offline_tests": 14,
+  "model_cases": 21,
+  "fixed_horizon_s": 0.14,
+  "control_rate_hz": 50,
+  "goal_tolerance_m": 0.005,
+  "solver_iteration_budget": 100,
+  "baseline_archive_sha256": "80e07a513a33a7fdb4a3059a4bd9bdb2d744c688b3b2c7bfd1190cda9eba1460",
+  "archive_sha256": "1ada4c4e2e089a859dbd215f047b3ab5ffcb6e7cd8c3656929e604414a577c7f",
+  "members": {
+    "model/comparison.csv": {
+      "sha256": "782346f62ec52a6d3bc53da050808dfa394580ef86666d3742968bf8ec4ea399",
+      "bytes": 2855
+    },
+    "model/cutoff_h140.csv": {
+      "sha256": "3c30def357298b28e109de995cb281307e9d4bfe9e631399856c6b01ac3fe7b6",
+      "bytes": 249523
+    },
+    "model/cutoff_h50.csv": {
+      "sha256": "8cfffeb92a0d02eae7b0d9beb224fe118af2465b84bb2dbaae2e514abddb64a5",
+      "bytes": 199203
+    },
+    "model/horizon_comparison.png": {
+      "sha256": "a26ee4bd8a94bd4a5c2b2b4ed2731512543c42bdf7fa2214b58a393b0ebede14",
+      "bytes": 126399
+    },
+    "model/summary.json": {
+      "sha256": "2960279d3fbbe20c23953e8d2baa3a1147d7c340b69af48e95471f93aa192d31",
+      "bytes": 13271
+    },
+    "model/timer_horizon.csv": {
+      "sha256": "6b61d3558cf69c3ae77b5d187697ef05e8483c81e79120fb1a84aa96ce5d4f1d",
+      "bytes": 114
+    },
+    "model/trace_h140.csv": {
+      "sha256": "bf0622caacf2ebd1abeabf9a98045aa492af02c07d589abbceec92294dc0636a",
+      "bytes": 278138
+    },
+    "model/trace_h50.csv": {
+      "sha256": "aac790274070e65554fa62d556cd77edf61aa627487ed37b99d5a6e035b4ca3c",
+      "bytes": 208482
+    },
+    "model/trace_stall200.csv": {
+      "sha256": "b35fb45943cd2e3201e2713a78d1dd4d94cb7fe84dbc2fba7cd90b3274db02a8",
+      "bytes": 222987
+    },
+    "logs/horizon_fixed140_initial.log": {
+      "sha256": "f4b8d4136c99f7982375f9f0f8fb56f4b32128b5177f3e16501810d6c618a6a2",
+      "bytes": 1474
+    },
+    "logs/horizon_fixed140_cpp.log": {
+      "sha256": "8cefe23b0a31e59b7ed19ca72cc3a69b0cf087aa8b6bcf046ba7168c6c5119b6",
+      "bytes": 94
+    },
+    "logs/horizon_fixed140_model_tests.log": {
+      "sha256": "69f14f54f5376f41a9268ac38391c8fd19cae04cac09c10d43e178194e6b48f4",
+      "bytes": 673
+    },
+    "logs/horizon_fixed140_existing_offline.log": {
+      "sha256": "251457ff6b7133d4cab281264ca9830eb26e91c05521273a3a799b359a156ccc",
+      "bytes": 1516
+    },
+    "logs/horizon_fixed140_model_run.log": {
+      "sha256": "0537cb51a42ee730c5ece74c2d75bc0d1ff88b6fa3725df943006dc009920a60",
+      "bytes": 100
+    },
+    "reproduction/test/test_qp_command_horizon.py": {
+      "sha256": "fd02263945d1fa3c753d5bf2087d5a2f382698cabb09a18fec63a98353665e33",
+      "bytes": 8606
+    },
+    "reproduction/test/test_command_horizon.py": {
+      "sha256": "10eb6cb941449b39b108db12353d269615e0d67631c6224eced3975546f15fbe",
+      "bytes": 1892
+    },
+    "reproduction/scripts/validate_command_horizon.py": {
+      "sha256": "0036283a51b9872061f0229d4cf8aa14a0871f96e26c8819f593ef0374977a37",
+      "bytes": 6307
+    },
+    "reproduction/package_horizon_fix.py": {
+      "sha256": "84694f06be5e8a163e574448e36384b9755c6b6d7ba220c6383af8636c5659dd",
+      "bytes": 4539
+    }
+  },
+  "not_run": [
+    "完整ROS/MoveIt节点构建",
+    "Gazebo",
+    "EtherCAT",
+    "真机停车/运动"
+  ],
+  "note": "140ms代码适配与Windows方法/模型验证；不宣称真机抖动已经消除"
+}
